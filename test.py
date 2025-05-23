@@ -41,8 +41,9 @@ def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
     dev = sc.Device("circ", layers=[layer], films=[film], holes=[hole],
                     length_units="um", solve_dtype="float32")
     #start = time.time()
-    el = edge_length(R_outer, h_min=h_min, h_max=h_max)
-    dev.make_mesh(max_edge_length=el,
+    #el = edge_length(R_outer, h_min=h_min, h_max=h_max)
+    min_points = 10_000
+    dev.make_mesh(min_points = min_points,
                   smooth=10) 
     #fig, ax = dev.plot_mesh(edge_color="k", show_sites=False,figsize=(10,5))
     #_ = dev.plot_polygons(ax=ax, legend=True)
