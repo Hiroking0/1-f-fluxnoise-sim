@@ -11,6 +11,7 @@ import superscreen as sc
 from superscreen.geometry import circle, box          # <-- NEW import
 from packaging import version
 from tqdm import tqdm
+import time
 
 # ─── device builders ──────────────────────────────────────────────
 def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
@@ -25,7 +26,9 @@ def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
                     length_units="um", solve_dtype="float32")  # (3)
     # choose a coarser edge length for large washers
     el = edge_small if R_outer <= 5 else edge_big               # (1)
+    start = time.time()
     dev.make_mesh(max_edge_length=el)
+    print(f"Meshing took {time.time() - start:.3f} seconds")
 
     return dev
 
@@ -81,12 +84,16 @@ def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
     if version.parse(sc.__version__) >= version.parse("0.7"):
         model = sc.factorize_model(device=device, current_units="A")
         model.set_circulating_currents({"hole": 1.0})
+        start = time.time()
         sol = sc.solve(model=model)[-1]
+        print(f"solving took {time.time() - start:.3f} seconds")
     else:
         model = sc.factorize_model(device,
                                    current_units="A",
                                    circulating_currents={"hole": 1.0})
+        start = time.time()
         sol = sc.solve(model)[-1]
+        print(f"solving took {time.time() - start:.3f} seconds")
 
     # grid on +x,+y quadrant
     pts  = np.asarray(device.films["film"].points)        # (N,2) array
