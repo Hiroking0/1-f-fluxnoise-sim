@@ -8,15 +8,16 @@ Recreates Fig. 3 of Koch–DiVincenzo–Clarke PRL 98 (2007) using SuperScreen.
 import numpy as np
 import matplotlib.pyplot as plt
 import superscreen as sc
-from superscreen.geometry import circle, box          # <-- NEW import
+from superscreen.geometry import circle, box   
 from packaging import version
 from tqdm import tqdm
 import time
-
+from datetime import datetime
+min_points = 50_000
 def edge_length(size_um,
-                h_min=0.15,          # µm, good for sub-10 µm devices
-                h_max=1.0,           # µm, acceptable for >100 µm devices
-                s_min=5, s_max=100,  # µm, sizes that bracket your sweep
+                h_min=0.15,          # µm
+                h_max=1.0,           # µm
+                s_min=5, s_max=100,  # µm
                 scale='linear'):
     """
     Return a size-dependent max_edge_length for mesh grading.
@@ -42,7 +43,6 @@ def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
                     length_units="um", solve_dtype="float32")
     #start = time.time()
     #el = edge_length(R_outer, h_min=h_min, h_max=h_max)
-    min_points = 10_000
     dev.make_mesh(min_points = min_points,
                   smooth=10) 
     #fig, ax = dev.plot_mesh(edge_color="k", show_sites=False,figsize=(10,5))
@@ -77,8 +77,8 @@ def square_device(side, linewidth, *,                       # side = outer edge 
     layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
 
     # --- boundary polygons ----------
-    outer = sc.box(side,     side,     points=Npts)
-    inner = sc.box(side - 2*linewidth,
+    outer = sc.geometry.box(side,     side,     points=Npts)
+    inner = sc.geometry.box(side - 2*linewidth,
                    side - 2*linewidth, points=Npts)
 
     film = sc.Polygon("film", layer="Nb", points=outer)
@@ -93,7 +93,8 @@ def square_device(side, linewidth, *,                       # side = outer edge 
 
     # --- choose mesh spacing based on size ----------
     el = edge_length(side)          # or edge_length(side) for the square
-    dev.make_mesh(max_edge_length=el, smooth=10)
+    dev.make_mesh(min_points = min_points,
+                  smooth=10) 
     
     return dev
 
@@ -147,18 +148,18 @@ def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
     return np.sqrt(alpha) / Phi0 * 1e6                 # µΦ0/√Hz @ 1 Hz
 
 # ─── sweep over geometries ───────────────────────────────────────
-outer_sizes = [i for i in range(10,100,2)]        # µm
+outer_sizes = [i for i in range(10,100,5)]        # µm
 cases = [
-    ("Circ 0.3 µm",   circular_device, 0.30)
-    # ("Circ 1.0 µm",   circular_device, 1.00),
-    # ("Square 0.3 µm", square_device, 0.30),
-    # ("Square 1.0 µm", square_device, 1.00),
+    ("Circ 0.3 µm",   circular_device, 0.30),
+    ("Circ 1.0 µm",   circular_device, 1.00),
+    ("Square 0.3 µm", square_device, 0.30),
+    ("Square 1.0 µm", square_device, 1.00),
 ]
 
 results = {}
 for label, builder, linewidth in cases:
     vals = []
-    for size in tqdm(outer_sizes):
+    for size in tqdm(outer_sizes,desc = label):
         dev = builder(size, linewidth)
         vals.append(flux_noise_rms(dev))
     results[label] = vals
@@ -173,4 +174,6 @@ plt.yscale("log")
 plt.legend(frameon=False)
 plt.title("Simulated flux noise vs washer size")
 plt.tight_layout()
+today = datetime.now().strftime("%Y-%m-%d-%H-%M")
+plt.savefig(f"plots/{today}.png")
 plt.show()
