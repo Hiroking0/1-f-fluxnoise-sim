@@ -13,6 +13,23 @@ from packaging import version
 from tqdm import tqdm
 import time
 
+def edge_length(size_um,
+                h_min=0.15,          # µm, good for sub-10 µm devices
+                h_max=1.0,           # µm, acceptable for >100 µm devices
+                s_min=5, s_max=100,  # µm, sizes that bracket your sweep
+                scale='linear'):
+    """
+    Return a size-dependent max_edge_length for mesh grading.
+    """
+    # normalised position in [0, 1]
+    t = min(1.0, max(0.0, (size_um - s_min)/(s_max - s_min)))
+    if scale == 'log':                     # logarithmic growth
+        h = h_min * (h_max/h_min)**t
+    else:                                  # linear growth
+        h = h_min + t*(h_max - h_min)
+    return h
+
+
 # ─── device builders ──────────────────────────────────────────────
 def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
                     edge_small=0.15, edge_big=0.5, Npts=100):
@@ -24,10 +41,10 @@ def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
 
     dev = sc.Device("circ", layers=[layer], films=[film], holes=[hole],
                     length_units="um", solve_dtype="float32")  # (3)
-    # choose a coarser edge length for large washers
-    el = edge_small if R_outer <= 5 else edge_big               # (1)
+    
     start = time.time()
-    dev.make_mesh(max_edge_length=el)
+    el = edge_length(R_outer)          # or edge_length(side) for the square
+    dev.make_mesh(max_edge_length=el, smooth=100)
     print(f"Meshing took {time.time() - start:.3f} seconds")
 
     return dev
@@ -71,8 +88,8 @@ def square_device(side, linewidth, *,                       # side = outer edge 
                     solve_dtype="float32")      # cuts memory in half
 
     # --- choose mesh spacing based on size ----------
-    el = edge_small if side <= 10 else edge_big
-    dev.make_mesh(max_edge_length=el)           # API: see docs :contentReference[oaicite:0]{index=0}
+    el = edge_length(side)          # or edge_length(side) for the square
+    dev.make_mesh(max_edge_length=el, smooth=100)
     return dev
 
 
