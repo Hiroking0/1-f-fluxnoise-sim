@@ -105,9 +105,9 @@ def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
     if version.parse(sc.__version__) >= version.parse("0.7"):
         model = sc.factorize_model(device=device, current_units="A")
         model.set_circulating_currents({"hole": 1.0})
-        start = time.time()
+        #start = time.time()
         sol = sc.solve(model=model)[-1]
-        print(f"solving took {time.time() - start:.3f} seconds")
+        #print(f"solving took {time.time() - start:.3f} seconds")
     else:
         model = sc.factorize_model(device,
                                    current_units="A",
