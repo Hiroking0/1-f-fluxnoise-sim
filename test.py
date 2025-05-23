@@ -32,25 +32,25 @@ def edge_length(size_um,
 
 # ─── device builders ──────────────────────────────────────────────
 def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
-                    edge_small=0.15, edge_big=0.5, Npts=100):
+                    h_min=0.3, h_max=1.5, Npts=40):       # ← coarser
     layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
     outer, inner = circle(R_outer), circle(R_outer - linewidth)
-    # fewer boundary points → fewer triangles
     film = sc.Polygon("film", layer="Nb", points=outer).resample(Npts)
     hole = sc.Polygon("hole", layer="Nb", points=inner).resample(Npts)
 
     dev = sc.Device("circ", layers=[layer], films=[film], holes=[hole],
-                    length_units="um", solve_dtype="float32")  # (3)
-    
-    start = time.time()
-    el = edge_length(R_outer)          # or edge_length(side) for the square
-    print("el: ",el)
-    dev.make_mesh(max_edge_length=el, smooth=100)
-    print(f"Meshing took {time.time() - start:.3f} seconds")
-    mesh = dev.meshes["film"]
-    print(mesh.n_sites)        # vertices
-    print(mesh.n_elements)     # triangles
+                    length_units="um", solve_dtype="float32")
+    #start = time.time()
+    el = edge_length(R_outer, h_min=h_min, h_max=h_max)
+    dev.make_mesh(max_edge_length=el,
+                  smooth=10) 
+    #fig, ax = dev.plot_mesh(edge_color="k", show_sites=False,figsize=(10,5))
+    #_ = dev.plot_polygons(ax=ax, legend=True)
+    #plt.show()
+    #print(f"Meshing took {time.time() - start:.3f} seconds")
+
     return dev
+
 
 
 def square_device(side, linewidth, *,                       # side = outer edge length (µm)
@@ -112,9 +112,9 @@ def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
         model = sc.factorize_model(device,
                                    current_units="A",
                                    circulating_currents={"hole": 1.0})
-        start = time.time()
+        #start = time.time()
         sol = sc.solve(model)[-1]
-        print(f"solving took {time.time() - start:.3f} seconds")
+        #print(f"solving took {time.time() - start:.3f} seconds")
 
     # grid on +x,+y quadrant
     pts  = np.asarray(device.films["film"].points)        # (N,2) array
