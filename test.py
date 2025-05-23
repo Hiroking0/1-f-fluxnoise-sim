@@ -89,7 +89,7 @@ def square_device(side, linewidth, *,                       # side = outer edge 
                     films=[film],
                     holes=[hole],
                     length_units="um",
-                    solve_dtype="float32")      # cuts memory in half
+                    solve_dtype="float32") 
 
     # --- choose mesh spacing based on size ----------
     el = edge_length(side)          # or edge_length(side) for the square
@@ -104,19 +104,12 @@ def square_device(side, linewidth, *,                       # side = outer edge 
 def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
                    pad=50.0, N=250):
     # 1 A circulating current for reciprocity
-    if version.parse(sc.__version__) >= version.parse("0.7"):
-        model = sc.factorize_model(device=device, current_units="A")
-        model.set_circulating_currents({"hole": 1.0})
-        #start = time.time()
-        sol = sc.solve(model=model)[-1]
-        #print(f"solving took {time.time() - start:.3f} seconds")
-    else:
-        model = sc.factorize_model(device,
-                                   current_units="A",
-                                   circulating_currents={"hole": 1.0})
-        #start = time.time()
-        sol = sc.solve(model)[-1]
-        #print(f"solving took {time.time() - start:.3f} seconds")
+    model = sc.factorize_model(device=device, current_units="A")
+    model.set_circulating_currents({"hole": 1.0})
+    #start = time.time()
+    sol = sc.solve(model=model)[-1]
+    #print(f"solving took {time.time() - start:.3f} seconds")
+
 
     # grid on +x,+y quadrant
     pts  = np.asarray(device.films["film"].points)        # (N,2) array
@@ -127,13 +120,8 @@ def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
     XY = [(x, y) for x in xs for y in ys]
 
     # Bz at grid
-    if hasattr(sol, "field_at_position"):
-        Bz = sol.field_at_position(XY, zs=z_spin, units="T").magnitude
-    else:
-        from superscreen.postprocessing import field_at_positions
-        Bz = field_at_positions(solution=sol, positions=XY,
-                                zs=z_spin, units="T")
-    Bz = Bz.reshape(N, N)
+    Bz = sol.field_at_position(XY, zs=z_spin, units="T").magnitude
+
 
     # Mutual-inductance map
     Mp = Bz * A_s * 1e-12              # H
