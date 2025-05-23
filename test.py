@@ -44,9 +44,11 @@ def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
     
     start = time.time()
     el = edge_length(R_outer)          # or edge_length(side) for the square
+    print("el: ",el)
     dev.make_mesh(max_edge_length=el, smooth=100)
     print(f"Meshing took {time.time() - start:.3f} seconds")
-
+    fig, ax = dev.plot_mesh(edge_color="k", show_sites=False,figsize=(10,5))
+    _ = dev.plot_polygons(ax=ax, legend=True)
     return dev
 
 
@@ -89,7 +91,8 @@ def square_device(side, linewidth, *,                       # side = outer edge 
 
     # --- choose mesh spacing based on size ----------
     el = edge_length(side)          # or edge_length(side) for the square
-    dev.make_mesh(max_edge_length=el, smooth=100)
+    dev.make_mesh(max_edge_length=el, smooth=10)
+    
     return dev
 
 
