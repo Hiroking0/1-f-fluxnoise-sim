@@ -1,152 +1,164 @@
 """
-Batch recreation of Fig. 3 from Koch–DiVincenzo–Clarke PRL 98 (2007)
-using SuperScreen **without a live Matplotlib window** and **with multiprocessing**.
+Reproduce the Fig. 3 flux‑noise simulations from Koch–DiVincenzo–Clarke,
+Phys. Rev. Lett. 98 (2007) 267003.
 
-▪ Circular & square washers, two linewidths each
-▪ √SΦ(1 Hz) vs outer size
-▪ Global progress tracked via a single `tqdm` bar
+Parameters are taken directly from the paper:
+    • Film thickness              t   = 0.10 µm   (100 nm)  fileciteturn2file11
+    • SQUID plane height          z0  = +1.0 µm   (loop at z = 1 µm)  fileciteturn2file11
+    • Test‑spin plane             z_s = 0 µm      (substrate surface)
+    • London penetration depth    λ   = 0.001 µm  (≈ ideal screening)
+    • Spin areal density          n   = 5 × 10¹⁷ m⁻²  fileciteturn2file2
+    • Spin loop area              A_s = 0.10 µm²   fileciteturn2file16
+    • Integration extends         L   = 100 µm beyond the washer edge  fileciteturn2file10
+    • Frequency band              f₁  = 10⁻⁴ Hz, f₂ = 10⁹ Hz  (ln‑factor ≈ 30)  fileciteturn2file10
+
+Two geometry sweeps are implemented, matching Fig. 3:
+    1. **Fixed aspect ratio** 2d / W = 4  ⇒  D = 3W, d = 2W.
+       W is varied logarithmically from 2 µm to 200 µm, giving
+       mean loop sizes (D+d) from 10 µm to 1000 µm.
+
+    2. **Fixed linewidth** W = 20 µm, d varied logarithmically from
+       5 µm to 500 µm ⇒ mean loop sizes from 45 µm to 1020 µm.
+
+The script uses **Superscreen ≥ 0.6**.  Typical runtime for the full
+sweep (~20 devices) is several minutes on a modern laptop.
 """
 
 from __future__ import annotations
 
-import os
-from datetime import datetime
-from functools import partial
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Tuple, List, Dict
-
 import numpy as np
 import matplotlib.pyplot as plt
 import superscreen as sc
-from superscreen.geometry import circle, box
-from tqdm.auto import tqdm
+from superscreen.geometry import box
+from tqdm import tqdm
+from datetime import datetime
 
-# ─── sweep specification ─────────────────────────────────────────
-outer_sizes: List[int] = list(range(10, 100, 3))          # µm
-cases = [  # label, shape, linewidth, marker, Npts
-    ("Circ 0.3 µm", "circle", 0.30, "o", 40),
-    ("Circ 1.0 µm", "circle", 1.00, "s", 40),
-    ("Square 0.3 µm", "square", 0.30, "D", 100),
-    ("Square 1.0 µm", "square", 1.00, "v", 100),
-]
-min_points = 30_000   # mesh target for SuperScreen
+# ───────────────────────────────────────────────────────────────
+# Physical constants
+MU_B  = 9.274e-24         # J/T
+PHI_0 = 2.067833848e-15   # Wb
+LN_BW = np.log(1e9 / 1e-4)  # ln(f₂ / f₁)
 
-# ─── helper functions ────────────────────────────────────────────
+# Simulation‑wide parameters (from paper)
+T_FILM   = 0.10      # µm
+LAMBDA   = 0.001     # µm  (≈ ideal)
+Z_LOOP   = 1.0       # µm  (washer plane)
+Z_SPIN   = 0.0       # µm  (substrate)
+A_SPIN   = 0.10      # µm²
+N_SPIN   = 5e17      # m⁻²
+PAD_L    = 100.0     # µm  (integration cutoff beyond edge)
 
-def edge_length(size_um: float, h_min=0.15, h_max=1.0,
-                s_min=5, s_max=100, scale="linear") -> float:
-    """Size‑dependent maximum triangle edge length for meshing."""
-    t = np.clip((size_um - s_min) / (s_max - s_min), 0.0, 1.0)
-    return h_min * (h_max / h_min) ** t if scale == "log" else h_min + t * (h_max - h_min)
+# Meshing parameters
+MIN_POINTS = 1_000   # rough target for mesh resolution
+SMOOTH_ITR = 10       # Lloyd smoothing passes
 
+# ───────────────────────────────────────────────────────────────
+# Geometry builder
 
-def build_device(shape: str, size: float, linewidth: float,
-                 lam=0.1, t=0.025, Npts=40) -> sc.Device:
-    """Return a circular or square washer SuperScreen device."""
-    layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
-    if shape == "circle":
-        film = sc.Polygon("film", layer="Nb", points=circle(size)).resample(Npts)
-        hole = sc.Polygon("hole", layer="Nb", points=circle(size - linewidth)).resample(Npts)
-    elif shape == "square":
-        film = sc.Polygon("film", layer="Nb", points=box(size, size, points=Npts))
-        hole = sc.Polygon("hole", layer="Nb", points=box(size - 2 * linewidth,
-                                                         size - 2 * linewidth,
-                                                         points=Npts))
-    else:
-        raise ValueError("shape must be 'circle' or 'square'")
+def washer_device(D: float, d: float) -> sc.Device:
+    """Return a *square* washer SQUID with outer half‑side *D* (µm) and
+    inner half‑side *d* (µm). All lengths in µm."""
+    layer = sc.Layer("Nb", london_lambda=LAMBDA, thickness=T_FILM, z0=Z_LOOP)
 
-    dev = sc.Device(f"{shape}_{size:.1f}µm", layers=[layer],
-                    films=[film], holes=[hole],
+    outer = box(2*D, 2*D, points=200)   # full side = 2D (µm)
+    inner = box(2*d, 2*d, points=200)   # full side = 2d (µm)
+
+    film = sc.Polygon("film", layer="Nb", points=outer)
+    hole = sc.Polygon("hole", layer="Nb", points=inner)
+
+    dev = sc.Device("washer", layers=[layer], films=[film], holes=[hole],
                     length_units="um", solve_dtype="float32")
-    dev.make_mesh(min_points=min_points, smooth=6)
+
+    # Mesh density scales (very roughly) with size to keep point count sane
+    max_el = 0.2 + 0.8 * (D / 1000.0)   # µm
+    dev.make_mesh(max_edge_length=max_el, min_points=MIN_POINTS,
+                  smooth=SMOOTH_ITR)
     return dev
 
+# ───────────────────────────────────────────────────────────────
+# Flux‑noise calculator
 
-def flux_noise_rms(device: sc.Device, z_spin=0.02, A_s=0.10, n=5e17,
-                   pad=50.0, N=150) -> float:
-    """Return √SΦ(1 Hz) in µΦ₀ / √Hz for *device*."""
+def flux_noise_rms(device: sc.Device, *, n=N_SPIN, A_s=A_SPIN,
+                   pad=PAD_L, grid_N=300) -> float:
+    """Return √S_Φ(1 Hz) in µΦ₀/√Hz for isotropic spins."""
+    # Reciprocity: 1 A circulating current around the hole
     model = sc.factorize_model(device=device, current_units="A")
     model.set_circulating_currents({"hole": 1.0})
-    sol = sc.solve(model=model)[-1]  # keyword avoids superscreen bug
+    solution = sc.solve(model)[-1]
 
-    # Set up evaluation grid
-    pts = np.asarray(device.films["film"].points)
-    r_max = max(abs(pts[:, 0]).max(), abs(pts[:, 1]).max()) + pad
-    xs = np.linspace(0.0, r_max, N)
-    ys = np.linspace(0.0, r_max, N)
-    grid = [(x, y) for x in xs for y in ys]
+    # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
+    outer = max(abs(device.films["film"].points).flatten())
+    Rmax  = outer + pad
 
-    bz = sol.field_at_position(grid, zs=z_spin, units="T").magnitude  # (N²,)
-    mp = bz * A_s * 1e-12                              # Φ due to one spin (Wb)
-    dA = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12     # m²
+    xs = np.linspace(0.0, Rmax, grid_N)
+    ys = np.linspace(0.0, Rmax, grid_N)
+    XY = [(x, y) for x in xs for y in ys]
 
-    mu_B = 9.274e-24
-    integral = np.sum((mp / (A_s * 1e-12)) ** 2) * dA
-    alpha = 8 * n * mu_B**2 * integral / np.log(1e9 / 1e-4)
-    phi0 = 2.067833848e-15
-    return np.sqrt(alpha) / phi0 * 1e6                 # µΦ₀ / √Hz
+    # B_z field of the 1‑A SQUID at spin plane
+    Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude
+    Bz = Bz.reshape((grid_N, grid_N))
+
+    # Mutual‑inductance density M(x,y) = Bz * A_s
+    Mp = Bz * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
+    dA = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12  # m² per pixel
+
+    integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
+
+    ms_flux = 8.0 * n * MU_B**2 * integral           # factor 8: 4 quadrants × 2 spins
+    alpha   = ms_flux / LN_BW                        # 1/f prefactor
+
+    return np.sqrt(alpha) / PHI_0 * 1e6              # µΦ₀ / √Hz
+
+# ───────────────────────────────────────────────────────────────
+# Sweep definitions matching Fig. 3
+
+def sweep_fixed_aspect_ratio():
+    """Sweep W so that 2d/W = 4 (=> D=3W, d=2W)."""
+    W_vals = np.geomspace(2.0, 200.0, 10)   # µm
+    mean_sizes = []
+    noises      = []
+
+    for W in tqdm(W_vals, desc="Aspect‑ratio 2d/W=4"):
+        d = 2.0 * W
+        D = 3.0 * W
+        dev = washer_device(D, d)
+        mean_sizes.append(D + d)
+        noises.append(flux_noise_rms(dev))
+    return np.array(mean_sizes), np.array(noises)
 
 
-def task(shape: str, size: float, linewidth: float, Npts: int) -> Tuple[str, float, float]:
-    """Execute one (shape, size, linewidth) simulation and return label, x, y."""
-    label = f"{shape}_{linewidth:.2f}"
-    dev = build_device(shape, size, linewidth, Npts=Npts)
-    y_val = flux_noise_rms(dev)
-    return label, size, y_val
+def sweep_fixed_width(W_fixed: float = 20.0):
+    """Sweep inner half‑side *d* with fixed linewidth W = 20 µm."""
+    d_vals = np.geomspace(5.0, 500.0, 10)   # µm
+    mean_sizes = []
+    noises      = []
 
+    for d in tqdm(d_vals, desc="Fixed W = 20 µm"):
+        D = d + W_fixed
+        dev = washer_device(D, d)
+        mean_sizes.append(D + d)
+        noises.append(flux_noise_rms(dev))
+    return np.array(mean_sizes), np.array(noises)
 
-# ─── main ────────────────────────────────────────────────────────
-
-def main() -> None:
-    total_runs = len(cases) * len(outer_sizes)
-    results: Dict[str, Tuple[List[float], List[float], str]] = {}
-
-    # Build argument list for the executor
-    arg_list = []
-    for label, shape, linewidth, marker, Npts in cases:
-        for size in outer_sizes:
-            arg_list.append((label, shape, linewidth, marker, Npts, size))
-
-    # Submit to process pool (uses all available CPUs by default)
-    with ProcessPoolExecutor() as pool, tqdm(total=total_runs, desc="Simulating", unit="run") as pbar:
-        future_to_meta = {
-            pool.submit(task, shape, size, linewidth, Npts): (label, marker)
-            for (label, shape, linewidth, marker, Npts, size) in arg_list
-        }
-        for fut in as_completed(future_to_meta):
-            label, marker = future_to_meta[fut]
-            sim_label, x_val, y_val = fut.result()
-            if label not in results:
-                results[label] = ([], [], marker)
-            results[label][0].append(x_val)  # xs
-            results[label][1].append(y_val)  # ys
-            pbar.update(1)
-
-    # Sort each series by x for nice plotting
-    for label in results:
-        xs, ys, marker = results[label]
-        xs, ys = map(list, zip(*sorted(zip(xs, ys))))
-        results[label] = (xs, ys, marker)
-
-    # ── static plot ─────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(6, 4))
-    for label, (xs, ys, marker) in results.items():
-        ax.plot(xs, ys, marker=marker, label=label, lw=1)
-
-    ax.set_xlabel("Outer dimension (µm)")
-    ax.set_ylabel(r"$\sqrt{S_{\Phi}\,(1\,\mathrm{Hz})}\;\left(\mu\Phi_0/\sqrt{\mathrm{Hz}}\right)$")
-    ax.set_yscale("log")
-    ax.set_title("Simulated flux noise vs washer size (multiprocessing)")
-    ax.grid(True, which="major", lw=0.5)
-    ax.grid(True, which="minor", lw=0.3)
-    ax.legend(frameon=False)
-    fig.tight_layout()
-
-    os.makedirs("plots", exist_ok=True)
-    fname = datetime.now().strftime("plots/%Y-%m-%d-%H-%M.svg")
-    fig.savefig(fname)
-    print(f"Saved figure to {fname}")
-
+# ───────────────────────────────────────────────────────────────
+# Main & plotting
 
 if __name__ == "__main__":
-    main()
+    sizes1, noises1 = sweep_fixed_aspect_ratio()
+    sizes2, noises2 = sweep_fixed_width()
+
+    plt.figure(figsize=(6.5, 4.2))
+    plt.loglog(sizes1, noises1, "o-", label=r"Aspect ratio $2d/W = 4$")
+    plt.loglog(sizes2, noises2, "s-", label=r"Fixed $W = 20\,\mu$m")
+
+    plt.xlabel(r"Mean loop size $(D+d)$ (µm)")
+    plt.ylabel(r"$\sqrt{S_\Phi(1\,\mathrm{Hz})}$  (µ$\Phi_0$/√Hz)")
+    plt.title("Fig. 3 reproduction – Koch et al. 2007")
+    plt.grid(True, which="both", ls=":", lw=0.5)
+    plt.legend(frameon=False)
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    plt.tight_layout()
+    plt.savefig(f"flux_noise_fig3_{ts}.png", dpi=300)
+    plt.show()
+
