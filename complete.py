@@ -49,7 +49,7 @@ N_SPIN   = 5e17      # m⁻²
 PAD_L    = 100.0     # µm  (integration cutoff beyond edge)
 
 # Meshing parameters
-MIN_POINTS = 1_000   # rough target for mesh resolution
+MIN_POINTS = 10_000   # rough target for mesh resolution
 SMOOTH_ITR = 10       # Lloyd smoothing passes
 
 # ───────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ def washer_device(D: float, d: float) -> sc.Device:
 
     # Mesh density scales (very roughly) with size to keep point count sane
     max_el = 0.2 + 0.8 * (D / 1000.0)   # µm
-    dev.make_mesh(max_edge_length=max_el, min_points=MIN_POINTS,
+    dev.make_mesh( min_points=MIN_POINTS,
                   smooth=SMOOTH_ITR)
     return dev
 
