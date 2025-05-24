@@ -1,134 +1,121 @@
 """
-Superscreen Quality Demo
-========================
-
-This script shows how to expose **one** user‑facing knob, `quality`, that
-trades simulation accuracy for run‑time in *SuperScreen* by scaling the
-finite‑element mesh density.
-
-*   `quality = 0.25` → very coarse / fast meshes
-*   `quality = 1.0`  → default (≈ publication‑grade)
-*   `quality > 1`    → ultra‑fine meshes for convergence tests
-
-The key idea is to convert `quality` into the two parameters that
-actually control element count:
-
-* **`max_edge_length`** – upper size limit for Triangle/meshgenerator.
-* **`smooth`** – number of Laplacian‑smoothing passes.
-
-Both are chosen from reasonable bounds and then divided or multiplied by
-`quality` so that *all* physics‑based safeguards (e.g. resolving Λ and
-trace widths) are still enforced.
-
-Tested with **superscreen 0.6.0** but should work back to 0.5.x.
+Recreates Fig. 3 of Koch–DiVincenzo–Clarke PRL 98 (2007)
+and shows the plot **while** the data are still being generated.
 """
 
-from __future__ import annotations
-
-import time
-from typing import Tuple, Dict
-
 import numpy as np
+import matplotlib.pyplot as plt
 import superscreen as sc
+from superscreen.geometry import circle, box
+from tqdm import tqdm
+from datetime import datetime
 
-##############################################################################
-# Helper: build a simple circular washer SQUID film                           #
-##############################################################################
+# ─── PARAMETERS ───────────────────────────────────────────────────
+min_points   = 100_000
+outer_sizes  = list(range(10, 100, 3))            # µm
+cases = [
+    ("Circ 0.3 µm",   0.30,  "o"),
+    ("Circ 1.0 µm",   1.00,  "s"),
+    ("Square 0.3 µm", 0.30,  "D"),
+    ("Square 1.0 µm", 1.00,  "v"),
+]
 
-def build_circular_washer(
-    r_outer: float = 50.0,   # µm, outer radius of washer
-    width: float = 2.0,      # µm, linewidth (so r_inner = r_outer – width)
-    lambda_nm: float = 350.0,
-    thickness_nm: float = 35.0,
-    name: str = "washer",
-) -> sc.Device:
-    """Return a thin‑film device: circular washer with a single hole."""
-    layer = sc.Layer(
-        "base",
-        london_lambda=lambda_nm * 1e-3,  # convert nm → µm
-        thickness=thickness_nm * 1e-3,
-    )
+# ─── MESH HELPER ──────────────────────────────────────────────────
+def edge_length(size_um, h_min=0.15, h_max=1.0,
+                s_min=5, s_max=100, scale="linear"):
+    t = np.clip((size_um - s_min)/(s_max - s_min), 0, 1)
+    if scale == "log":
+        return h_min * (h_max/h_min)**t
+    return h_min + t*(h_max - h_min)
 
-    film = sc.Polygon(
-        name="film",
-        layer="base",
-        points=sc.geometry.circle(r_outer),
-    )
-    hole = sc.Polygon(
-        name="hole",
-        layer="base",
-        points=sc.geometry.circle(r_outer - width),
-    )
+# ─── DEVICE BUILDERS ──────────────────────────────────────────────
+def circular_device(R_outer, linewidth, lam=0.1, t=0.025,
+                    Npts=40):
+    layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
+    film  = sc.Polygon("film", layer="Nb",
+                       points=circle(R_outer)).resample(Npts)
+    hole  = sc.Polygon("hole", layer="Nb",
+                       points=circle(R_outer - linewidth)).resample(Npts)
+    dev = sc.Device("circ", layers=[layer], films=[film], holes=[hole],
+                    length_units="um", solve_dtype="float32")
+    dev.make_mesh(min_points=min_points, smooth=10)
+    return dev
 
-    return sc.Device(
-        name=name,
-        layers=[layer],
-        films={"film": film},
-        holes={"hole": hole},
-        length_units="um",
-    )
+def square_device(side, linewidth, lam=0.1, t=0.025, Npts=100):
+    layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
+    film  = sc.Polygon("film",  layer="Nb",
+                       points=box(side, side, points=Npts))
+    hole  = sc.Polygon("hole", layer="Nb",
+                       points=box(side-2*linewidth,
+                                  side-2*linewidth, points=Npts))
+    dev = sc.Device("square", layers=[layer], films=[film], holes=[hole],
+                    length_units="um", solve_dtype="float32")
+    dev.make_mesh(min_points=min_points, smooth=10)
+    return dev
 
-##############################################################################
-# Mesh + solve with a single “quality” parameter                              #
-##############################################################################
+# ─── FLUX-NOISE CALCULATOR ────────────────────────────────────────
+def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
+                   pad=50.0, N=250):
+    model = sc.factorize_model(device=device, current_units="A")
+    model.set_circulating_currents({"hole": 1.0})
+    sol = sc.solve(model)[-1]
 
-def _characteristic_size(dev: sc.Device) -> float:
-    """Half the larger span of the device (µm)."""
-    pts = dev.poly_points  # shape (N, 2)
-    return 0.5 * max(pts[:, 0].ptp(), pts[:, 1].ptp())
+    pts  = np.asarray(device.films["film"].points)
+    Rmax = max(abs(pts[:, 0]).max(), abs(pts[:, 1]).max()) + pad
+    xs   = np.linspace(0, Rmax, N)
+    ys   = np.linspace(0, Rmax, N)
+    XY   = [(x, y) for x in xs for y in ys]
 
+    Bz   = sol.field_at_position(XY, zs=z_spin, units="T").magnitude
+    Mp   = Bz * A_s * 1e-12                       # mutual-inductance map
+    dA   = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12
+    integral = np.sum((Mp / (A_s*1e-12))**2) * dA
 
-def solve_device(
-    dev: sc.Device,
-    quality: float = 1.0,
-    lambda_eff: float = 0.30,  # µm, effective penetration depth Λ
-    h_min: float = 0.15,       # µm, smallest edge we'll ever allow
-    h_max: float = 1.5,        # µm, coarsest edge if quality==1 and size>=100 µm
-    smooth_max: int = 100,
-) -> Tuple[sc.Solution, Dict[str, float]]:
-    """Mesh *dev* according to *quality* and return (solution, stats)."""
+    mu_B = 9.274e-24
+    alpha = 8 * n * mu_B**2 * integral / np.log(1e9 / 1e-4)
+    Phi0  = 2.067833848e-15
+    return np.sqrt(alpha)/Phi0 * 1e6              # µΦ0 / √Hz @ 1 Hz
 
-    quality = max(1e-3, quality)  # avoid division by zero
-    size_um = _characteristic_size(dev)
+# ─── LIVE PLOT SET-UP ─────────────────────────────────────────────
+plt.ion()
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.set_yscale("log")
+ax.set_xlabel("Outer dimension (µm)")
+ax.set_ylabel(r"$\sqrt{S_\Phi(1\;\mathrm{Hz})}$  (µ$\Phi_0$/√Hz)")
+ax.set_title("Simulated flux noise vs washer size")
+ax.grid(True, which="major", lw=0.5)
+ax.grid(True, which="minor", lw=0.3)
 
-    # Base target that grows with size, then scale by 1/quality
-    h_target = h_min + (h_max - h_min) * min(1.0, size_um / 100.0)
-    h_target /= quality
-    h_target = min(h_target, lambda_eff / 4)  # physics safeguard
+# Create empty Line2D objects – one per case
+lines, xs_so_far, ys_so_far = {}, {}, {}
+for label, _, marker in cases:
+    (line,) = ax.plot([], [], marker=marker, label=label)
+    lines[label] = line
+    xs_so_far[label], ys_so_far[label] = [], []
+ax.legend(frameon=False)
 
-    smooth = int(round(smooth_max * quality))
+# ─── MAIN SWEEP WITH LIVE UPDATES ─────────────────────────────────
+for label, linewidth, _ in cases:
+    builder = circular_device if "Circ" in label else square_device
+    for size in tqdm(outer_sizes, desc=f"{label:>12}"):
+        dev  = builder(size, linewidth)
+        yval = flux_noise_rms(dev)
 
-    # ------------------------------------------------------------------ mesh
-    dev.make_mesh(max_edge_length=h_target, smooth=smooth)
+        # append and update the line
+        xs_so_far[label].append(size)
+        ys_so_far[label].append(yval)
+        line = lines[label]
+        line.set_data(xs_so_far[label], ys_so_far[label])
 
-    # ------------------------------------------------------------------ solve
-    t0 = time.perf_counter()
-    solution = sc.solve(dev)[-1]  # steady‑state (last frame)
-    t1 = time.perf_counter()
+        # rescale axes to fit new data, then redraw
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw_idle()
+        plt.pause(0.01)        # tiny pause lets the GUI process events
 
-    mesh = dev.meshes["film"]
-    stats = {
-        "edge_length": h_target,
-        "smooth_passes": smooth,
-        "n_vertices": mesh.sites.shape[0],
-        "n_elements": mesh.elements.shape[0],
-        "solve_time_s": t1 - t0,
-    }
-    return solution, stats
-
-##############################################################################
-# Quick demo                                                                  #
-##############################################################################
-
-def demo() -> None:
-    print("quality  el[µm]  vertices  elements  time[s]")
-    print("——" * 18)
-    for q in (0.25, 0.5, 1.0):
-        dev = build_circular_washer(name=f"washer_q{q}")
-        _, st = solve_device(dev, quality=q)
-        print(f"{q:>6.2f}  {st['edge_length']:<6.3f}  {st['n_vertices']:>8d}  "
-              f"{st['n_elements']:>8d}  {st['solve_time_s']:>6.2f}")
-
-
-if __name__ == "__main__":
-    demo()
+# ─── FINISH UP ────────────────────────────────────────────────────
+plt.ioff()
+fig.tight_layout()
+today = datetime.now().strftime("%Y-%m-%d-%H-%M")
+fig.savefig(f"plots/{today}.svg")
+plt.show()
