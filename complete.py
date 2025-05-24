@@ -153,7 +153,6 @@ if __name__ == "__main__":
 
     plt.xlabel(r"Mean loop size $(D+d)$ (µm)")
     plt.ylabel(r"$\sqrt{S_\Phi(1\,\mathrm{Hz})}$  (µ$\Phi_0$/√Hz)")
-    plt.title("Fig. 3 reproduction – Koch et al. 2007")
     plt.grid(True, which="both", ls=":", lw=0.5)
     plt.legend(frameon=False)
 
