@@ -84,7 +84,7 @@ def flux_noise_rms(device: sc.Device, *, n=N_SPIN, A_s=A_SPIN,
     # Reciprocity: 1 A circulating current around the hole
     model = sc.factorize_model(device=device, current_units="A")
     model.set_circulating_currents({"hole": 1.0})
-    solution = sc.solve(model)[-1]
+    solution = sc.solve(model=model)[-1]
 
     # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
     outer = max(abs(device.films["film"].points).flatten())
