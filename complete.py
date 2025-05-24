@@ -1,9 +1,9 @@
 """
-Batch recreation of Fig. 3 from Koch–DiVincenzo–Clarke PRL 98 (2007)
+Batch recreation of Fig. 3 from Koch–DiVincenzo–Clarke PRL 98 (2007)
 using SuperScreen **without a live Matplotlib window** and **with multiprocessing**.
 
 ▪ Circular & square washers, two linewidths each
-▪ √SΦ(1 Hz) vs outer size
+▪ √SΦ(1 Hz) vs outer size
 ▪ Global progress tracked via a single `tqdm` bar
 """
 
@@ -29,13 +29,13 @@ cases = [  # label, shape, linewidth, marker, Npts
     ("Square 0.3 µm", "square", 0.30, "D", 100),
     ("Square 1.0 µm", "square", 1.00, "v", 100),
 ]
-min_points = 1_000   # mesh target for SuperScreen
+min_points = 30_000   # mesh target for SuperScreen
 
 # ─── helper functions ────────────────────────────────────────────
 
 def edge_length(size_um: float, h_min=0.15, h_max=1.0,
                 s_min=5, s_max=100, scale="linear") -> float:
-    """Size-dependent maximum triangle edge length for meshing."""
+    """Size‑dependent maximum triangle edge length for meshing."""
     t = np.clip((size_um - s_min) / (s_max - s_min), 0.0, 1.0)
     return h_min * (h_max / h_min) ** t if scale == "log" else h_min + t * (h_max - h_min)
 
@@ -64,10 +64,10 @@ def build_device(shape: str, size: float, linewidth: float,
 
 def flux_noise_rms(device: sc.Device, z_spin=0.02, A_s=0.10, n=5e17,
                    pad=50.0, N=150) -> float:
-    """Return √SΦ(1 Hz) in µΦ₀ / √Hz for *device*."""
+    """Return √SΦ(1 Hz) in µΦ₀ / √Hz for *device*."""
     model = sc.factorize_model(device=device, current_units="A")
     model.set_circulating_currents({"hole": 1.0})
-    sol = sc.solve(model)[-1]
+    sol = sc.solve(model=model)[-1]  # keyword avoids superscreen bug
 
     # Set up evaluation grid
     pts = np.asarray(device.films["film"].points)
@@ -84,7 +84,7 @@ def flux_noise_rms(device: sc.Device, z_spin=0.02, A_s=0.10, n=5e17,
     integral = np.sum((mp / (A_s * 1e-12)) ** 2) * dA
     alpha = 8 * n * mu_B**2 * integral / np.log(1e9 / 1e-4)
     phi0 = 2.067833848e-15
-    return np.sqrt(alpha) / phi0 * 1e6                 # µΦ₀ / √Hz
+    return np.sqrt(alpha) / phi0 * 1e6                 # µΦ₀ / √Hz
 
 
 def task(shape: str, size: float, linewidth: float, Npts: int) -> Tuple[str, float, float]:
@@ -134,7 +134,7 @@ def main() -> None:
         ax.plot(xs, ys, marker=marker, label=label, lw=1)
 
     ax.set_xlabel("Outer dimension (µm)")
-    ax.set_ylabel(r"$\\sqrt{S_\\Phi\\,(1\\;\\mathrm{Hz})}$   (µ$\\Phi_0$/√Hz)")
+    ax.set_ylabel(r"$\sqrt{S_{\Phi}\,(1\,\mathrm{Hz})}\;\left(\mu\Phi_0/\sqrt{\mathrm{Hz}}\right)$")
     ax.set_yscale("log")
     ax.set_title("Simulated flux noise vs washer size (multiprocessing)")
     ax.grid(True, which="major", lw=0.5)
