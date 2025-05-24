@@ -49,7 +49,7 @@ N_SPIN   = 5e17      # m⁻²
 PAD_L    = 100.0     # µm  (integration cutoff beyond edge)
 
 # Meshing parameters
-MIN_POINTS = 10_000   # rough target for mesh resolution
+MIN_POINTS = 20_000   # rough target for mesh resolution
 SMOOTH_ITR = 10       # Lloyd smoothing passes
 
 # ───────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ def flux_noise_rms(device: sc.Device, *, n=N_SPIN, A_s=A_SPIN,
 
 def sweep_fixed_aspect_ratio():
     """Sweep W so that 2d/W = 4 (=> D=3W, d=2W)."""
-    W_vals = np.geomspace(2.0, 200.0, 10)   # µm
+    W_vals = np.geomspace(2.0, 200.0, 50)   # µm
     mean_sizes = []
     noises      = []
 
@@ -129,7 +129,7 @@ def sweep_fixed_aspect_ratio():
 
 def sweep_fixed_width(W_fixed: float = 20.0):
     """Sweep inner half‑side *d* with fixed linewidth W = 20 µm."""
-    d_vals = np.geomspace(5.0, 500.0, 10)   # µm
+    d_vals = np.geomspace(5.0, 500.0, 50)   # µm
     mean_sizes = []
     noises      = []
 
