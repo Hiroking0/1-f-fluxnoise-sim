@@ -13,7 +13,7 @@ from packaging import version
 from tqdm import tqdm
 import time
 from datetime import datetime
-min_points = 100_000
+min_points = 10_000
 def edge_length(size_um,
                 h_min=0.15,          # µm
                 h_max=1.0,           # µm
@@ -160,7 +160,6 @@ plt.xlabel("Outer dimension (µm)")                      # R or half-side
 plt.ylabel(r"$\sqrt{S_\Phi(1\ \mathrm{Hz})}$  (µ$\Phi_0$/√Hz)")
 plt.yscale("log")
 plt.legend(frameon=False)
-plt.title("Simulated flux noise vs washer size")
 plt.grid(True, which='major', linestyle='-', linewidth=0.5)
 plt.grid(True, which='minor', linestyle='-', linewidth=0.3)
 plt.tight_layout()
