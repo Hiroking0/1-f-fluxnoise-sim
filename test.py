@@ -13,7 +13,7 @@ from packaging import version
 from tqdm import tqdm
 import time
 from datetime import datetime
-min_points = 50_000
+min_points = 100_000
 def edge_length(size_um,
                 h_min=0.15,          # µm
                 h_max=1.0,           # µm
@@ -136,7 +136,7 @@ def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
     return np.sqrt(alpha) / Phi0 * 1e6                 # µΦ0/√Hz @ 1 Hz
 
 # ─── sweep over geometries ───────────────────────────────────────
-outer_sizes = [i for i in range(10,100,5)]        # µm
+outer_sizes = [i for i in range(10,100,3)]        # µm
 cases = [
     ("Circ 0.3 µm",   circular_device, 0.30),
     ("Circ 1.0 µm",   circular_device, 1.00),
@@ -161,7 +161,9 @@ plt.ylabel(r"$\sqrt{S_\Phi(1\ \mathrm{Hz})}$  (µ$\Phi_0$/√Hz)")
 plt.yscale("log")
 plt.legend(frameon=False)
 plt.title("Simulated flux noise vs washer size")
+plt.grid(True, which='major', linestyle='-', linewidth=0.5)
+plt.grid(True, which='minor', linestyle='-', linewidth=0.3)
 plt.tight_layout()
 today = datetime.now().strftime("%Y-%m-%d-%H-%M")
-plt.savefig(f"plots/{today}.png")
+plt.savefig(f"plots/{today}.svg")
 plt.show()
