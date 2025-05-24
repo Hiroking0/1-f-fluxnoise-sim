@@ -1,140 +1,152 @@
 """
-Live, non-blocking recreation of Fig. 3 from
-Koch–DiVincenzo–Clarke PRL 98 (2007) using SuperScreen.
+Batch recreation of Fig. 3 from Koch–DiVincenzo–Clarke PRL 98 (2007)
+using SuperScreen **without a live Matplotlib window** and **with multiprocessing**.
 
-* Circular & square washers, two linewidths each
-* √SΦ(1 Hz) vs outer size
-* GUI stays responsive via multiprocessing
+▪ Circular & square washers, two linewidths each
+▪ √SΦ(1 Hz) vs outer size
+▪ Global progress tracked via a single `tqdm` bar
 """
 
-import os, gc, time
+from __future__ import annotations
+
+import os
 from datetime import datetime
-from multiprocessing import Process, Queue
+from functools import partial
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Tuple, List, Dict
 
 import numpy as np
 import matplotlib.pyplot as plt
 import superscreen as sc
 from superscreen.geometry import circle, box
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
-# ─── sweep parameters ────────────────────────────────────────────
-outer_sizes = list(range(10, 100, 3))     # µm
-cases = [                                 # label, linewidth, marker
-    ("Circ 0.3 µm",   0.30, "o"),
-    ("Circ 1.0 µm",   1.00, "s"),
-    ("Square 0.3 µm", 0.30, "D"),
-    ("Square 1.0 µm", 1.00, "v"),
+# ─── sweep specification ─────────────────────────────────────────
+outer_sizes: List[int] = list(range(10, 100, 3))          # µm
+cases = [  # label, shape, linewidth, marker, Npts
+    ("Circ 0.3 µm", "circle", 0.30, "o", 40),
+    ("Circ 1.0 µm", "circle", 1.00, "s", 40),
+    ("Square 0.3 µm", "square", 0.30, "D", 100),
+    ("Square 1.0 µm", "square", 1.00, "v", 100),
 ]
-min_points = 30_000                       # lighter meshes → faster
+min_points = 1_000   # mesh target for SuperScreen
 
-# ─── helpers ─────────────────────────────────────────────────────
-def edge_length(size_um,  h_min=0.15, h_max=1.0,
-                s_min=5, s_max=100, scale="linear"):
-    t = np.clip((size_um - s_min)/(s_max - s_min), 0, 1)
-    return h_min * (h_max/h_min)**t if scale == "log" else h_min + t*(h_max-h_min)
+# ─── helper functions ────────────────────────────────────────────
 
-def circular_device(R_outer, linewidth, lam=0.1, t=0.025, Npts=40):
+def edge_length(size_um: float, h_min=0.15, h_max=1.0,
+                s_min=5, s_max=100, scale="linear") -> float:
+    """Size-dependent maximum triangle edge length for meshing."""
+    t = np.clip((size_um - s_min) / (s_max - s_min), 0.0, 1.0)
+    return h_min * (h_max / h_min) ** t if scale == "log" else h_min + t * (h_max - h_min)
+
+
+def build_device(shape: str, size: float, linewidth: float,
+                 lam=0.1, t=0.025, Npts=40) -> sc.Device:
+    """Return a circular or square washer SuperScreen device."""
     layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
-    film  = sc.Polygon("film", layer="Nb",
-                       points=circle(R_outer)).resample(Npts)
-    hole  = sc.Polygon("hole", layer="Nb",
-                       points=circle(R_outer-linewidth)).resample(Npts)
-    dev   = sc.Device("circ", layers=[layer], films=[film], holes=[hole],
-                      length_units="um", solve_dtype="float32")
+    if shape == "circle":
+        film = sc.Polygon("film", layer="Nb", points=circle(size)).resample(Npts)
+        hole = sc.Polygon("hole", layer="Nb", points=circle(size - linewidth)).resample(Npts)
+    elif shape == "square":
+        film = sc.Polygon("film", layer="Nb", points=box(size, size, points=Npts))
+        hole = sc.Polygon("hole", layer="Nb", points=box(size - 2 * linewidth,
+                                                         size - 2 * linewidth,
+                                                         points=Npts))
+    else:
+        raise ValueError("shape must be 'circle' or 'square'")
+
+    dev = sc.Device(f"{shape}_{size:.1f}µm", layers=[layer],
+                    films=[film], holes=[hole],
+                    length_units="um", solve_dtype="float32")
     dev.make_mesh(min_points=min_points, smooth=6)
     return dev
 
-def square_device(side, linewidth, lam=0.1, t=0.025, Npts=100):
-    layer = sc.Layer("Nb", london_lambda=lam, thickness=t, z0=0)
-    film  = sc.Polygon("film", layer="Nb",
-                       points=box(side, side, points=Npts))
-    hole  = sc.Polygon("hole", layer="Nb",
-                       points=box(side-2*linewidth,
-                                  side-2*linewidth, points=Npts))
-    dev   = sc.Device("square", layers=[layer], films=[film], holes=[hole],
-                      length_units="um", solve_dtype="float32")
-    dev.make_mesh(min_points=min_points, smooth=6)
-    return dev
 
-def flux_noise_rms(device, z_spin=0.02, A_s=0.10, n=5e17,
-                   pad=50.0, N=150):
+def flux_noise_rms(device: sc.Device, z_spin=0.02, A_s=0.10, n=5e17,
+                   pad=50.0, N=150) -> float:
+    """Return √SΦ(1 Hz) in µΦ₀ / √Hz for *device*."""
     model = sc.factorize_model(device=device, current_units="A")
     model.set_circulating_currents({"hole": 1.0})
-    sol   = sc.solve(model=model)[-1]
+    sol = sc.solve(model)[-1]
 
-    pts   = np.asarray(device.films["film"].points)
-    Rmax  = max(abs(pts[:,0]).max(), abs(pts[:,1]).max()) + pad
-    xs    = np.linspace(0, Rmax, N)
-    ys    = np.linspace(0, Rmax, N)
-    XY    = [(x, y) for x in xs for y in ys]
+    # Set up evaluation grid
+    pts = np.asarray(device.films["film"].points)
+    r_max = max(abs(pts[:, 0]).max(), abs(pts[:, 1]).max()) + pad
+    xs = np.linspace(0.0, r_max, N)
+    ys = np.linspace(0.0, r_max, N)
+    grid = [(x, y) for x in xs for y in ys]
 
-    Bz    = sol.field_at_position(XY, zs=z_spin, units="T").magnitude
-    Mp    = Bz * A_s * 1e-12
-    dA    = (xs[1]-xs[0]) * (ys[1]-ys[0]) * 1e-12
-    integral = np.sum((Mp/(A_s*1e-12))**2) * dA
+    bz = sol.field_at_position(grid, zs=z_spin, units="T").magnitude  # (N²,)
+    mp = bz * A_s * 1e-12                              # Φ due to one spin (Wb)
+    dA = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12     # m²
 
-    mu_B  = 9.274e-24
-    alpha = 8 * n * mu_B**2 * integral / np.log(1e9/1e-4)
-    Phi0  = 2.067833848e-15
-    return np.sqrt(alpha)/Phi0 * 1e6      # µΦ0 / √Hz
+    mu_B = 9.274e-24
+    integral = np.sum((mp / (A_s * 1e-12)) ** 2) * dA
+    alpha = 8 * n * mu_B**2 * integral / np.log(1e9 / 1e-4)
+    phi0 = 2.067833848e-15
+    return np.sqrt(alpha) / phi0 * 1e6                 # µΦ₀ / √Hz
 
-# ─── worker process ──────────────────────────────────────────────
-def worker(label, linewidth, q):
-    builder = circular_device if "Circ" in label else square_device
-    for size in outer_sizes:
-        y = flux_noise_rms(builder(size, linewidth))
-        q.put((label, size, y))
-    q.put((label, None, None))            # sentinel → this case is done
 
-# ─── main (GUI) process ──────────────────────────────────────────
-def main():
-    # ── figure & empty lines ────────────────────────────────────
-    plt.ion()
+def task(shape: str, size: float, linewidth: float, Npts: int) -> Tuple[str, float, float]:
+    """Execute one (shape, size, linewidth) simulation and return label, x, y."""
+    label = f"{shape}_{linewidth:.2f}"
+    dev = build_device(shape, size, linewidth, Npts=Npts)
+    y_val = flux_noise_rms(dev)
+    return label, size, y_val
+
+
+# ─── main ────────────────────────────────────────────────────────
+
+def main() -> None:
+    total_runs = len(cases) * len(outer_sizes)
+    results: Dict[str, Tuple[List[float], List[float], str]] = {}
+
+    # Build argument list for the executor
+    arg_list = []
+    for label, shape, linewidth, marker, Npts in cases:
+        for size in outer_sizes:
+            arg_list.append((label, shape, linewidth, marker, Npts, size))
+
+    # Submit to process pool (uses all available CPUs by default)
+    with ProcessPoolExecutor() as pool, tqdm(total=total_runs, desc="Simulating", unit="run") as pbar:
+        future_to_meta = {
+            pool.submit(task, shape, size, linewidth, Npts): (label, marker)
+            for (label, shape, linewidth, marker, Npts, size) in arg_list
+        }
+        for fut in as_completed(future_to_meta):
+            label, marker = future_to_meta[fut]
+            sim_label, x_val, y_val = fut.result()
+            if label not in results:
+                results[label] = ([], [], marker)
+            results[label][0].append(x_val)  # xs
+            results[label][1].append(y_val)  # ys
+            pbar.update(1)
+
+    # Sort each series by x for nice plotting
+    for label in results:
+        xs, ys, marker = results[label]
+        xs, ys = map(list, zip(*sorted(zip(xs, ys))))
+        results[label] = (xs, ys, marker)
+
+    # ── static plot ─────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(6, 4))
+    for label, (xs, ys, marker) in results.items():
+        ax.plot(xs, ys, marker=marker, label=label, lw=1)
+
     ax.set_xlabel("Outer dimension (µm)")
-    ax.set_ylabel(r"$\sqrt{S_\Phi\,(1\;\mathrm{Hz})}$   (µ$\Phi_0$/√Hz)")
+    ax.set_ylabel(r"$\\sqrt{S_\\Phi\\,(1\\;\\mathrm{Hz})}$   (µ$\\Phi_0$/√Hz)")
     ax.set_yscale("log")
-    ax.set_title("Simulated flux noise vs washer size")
+    ax.set_title("Simulated flux noise vs washer size (multiprocessing)")
     ax.grid(True, which="major", lw=0.5)
     ax.grid(True, which="minor", lw=0.3)
-
-    lines, xs_so_far, ys_so_far, queues, procs = {}, {}, {}, {}, {}
-    for label, _, marker in cases:
-        (line,) = ax.plot([], [], marker=marker, label=label, lw=1)
-        lines[label] = line
-        xs_so_far[label], ys_so_far[label] = [], []
-        q = Queue();  queues[label] = q
-        procs[label] = Process(target=worker, args=(label, _ , q))
-        procs[label].start()
-
     ax.legend(frameon=False)
-    finished = set()
-
-    # ── event / update loop ─────────────────────────────────────
-    while len(finished) < len(cases):
-        for label, q in queues.items():
-            while not q.empty():
-                lbl, x, y = q.get()
-                if x is None:                # sentinel: this label is done
-                    finished.add(lbl)
-                    break
-                xs_so_far[lbl].append(x)
-                ys_so_far[lbl].append(y)
-                lines[lbl].set_data(xs_so_far[lbl], ys_so_far[lbl])
-        ax.relim();  ax.autoscale_view()
-        fig.canvas.draw_idle()
-        plt.pause(0.01)                      # keep GUI responsive
-
-    # ── clean up ────────────────────────────────────────────────
-    for p in procs.values():
-        p.join()
-    plt.ioff()
     fig.tight_layout()
+
     os.makedirs("plots", exist_ok=True)
     fname = datetime.now().strftime("plots/%Y-%m-%d-%H-%M.svg")
     fig.savefig(fname)
-    print(f"\nSaved final plot to {fname}")
-    plt.show()
+    print(f"Saved figure to {fname}")
+
 
 if __name__ == "__main__":
     main()
