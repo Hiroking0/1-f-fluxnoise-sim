@@ -158,6 +158,6 @@ if __name__ == "__main__":
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     plt.tight_layout()
-    plt.savefig(f"flux_noise_fig3_{ts}.png", dpi=300)
+    plt.savefig(f"plots/flux_noise_fig3_{ts}.png", dpi=300)
     plt.show()
 
