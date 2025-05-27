@@ -172,9 +172,9 @@ def plot_Bz_color(device: sc.Device,
 
     # grid covering the +x,+y quadrant  ----------------------------------------
     outer = max(abs(device.films["film"].points).flatten())  # µm
-    Rmax  = outer + pad
-    xs    = np.linspace(0.0, Rmax, grid_N)
-    ys    = np.linspace(0.0, Rmax, grid_N)
+    Rmax  = outer
+    xs    = np.linspace(-Rmax, Rmax, grid_N)
+    ys    = np.linspace(-Rmax, Rmax, grid_N)
     XY    = [(x, y) for x in xs for y in ys]
 
     Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude.reshape((grid_N, grid_N))          
