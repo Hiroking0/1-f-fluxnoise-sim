@@ -186,12 +186,12 @@ def plot_Bz_color(device: sc.Device,
                        shading="auto", cmap=cmap)
     
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
-    cbar.set_label("$B_z$  (T per 1 A)", rotation=270, labelpad=12)
+    cbar.set_label("$B_z$  [T]", rotation=270, labelpad=12)
 
     ax.set_xlabel("$x$ (µm)")
     ax.set_ylabel("$y$ (µm)")
     ax.set_aspect("equal")
-    _ = device.plot_polygons(ax=ax, legend=True)
+    _ = device.plot_polygons(ax=ax,color="black")
     plt.tight_layout()
     plt.show()
 
