@@ -172,7 +172,7 @@ def plot_Bz_color(device: sc.Device,
 
     # grid covering the +x,+y quadrant  ----------------------------------------
     outer = max(abs(device.films["film"].points).flatten())  # µm
-    Rmax  = outer
+    Rmax  = outer*1.3
     xs    = np.linspace(-Rmax, Rmax, grid_N)
     ys    = np.linspace(-Rmax, Rmax, grid_N)
     XY    = [(x, y) for x in xs for y in ys]
