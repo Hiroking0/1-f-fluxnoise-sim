@@ -149,7 +149,7 @@ def sweep_fixed_width(W_fixed: float = 20.0):
 def plot_Bz_color(device: sc.Device,
                   pad: float = PAD_L,
                   grid_N: int = 300,
-                  cmap: str = "RdBu_r"):
+                  cmap: str = "plasma"):
     """
     Plot Bz(x, y) [Tesla per 1 A circulating current] on a quadrant grid.
 
