@@ -184,13 +184,14 @@ def plot_Bz_color(device: sc.Device,
     fig, ax = plt.subplots(figsize=(5.5, 4.5))
     im = ax.pcolormesh(X, Y, Bz,
                        shading="auto", cmap=cmap)
+    
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
     cbar.set_label("$B_z$  (T per 1 A)", rotation=270, labelpad=12)
 
     ax.set_xlabel("$x$ (µm)")
     ax.set_ylabel("$y$ (µm)")
     ax.set_aspect("equal")
-    ax.set_title("Reciprocity field $B_z(x,y)$ on spin plane")
+    _ = device.plot_polygons(ax=ax, legend=True)
     plt.tight_layout()
     plt.show()
 
