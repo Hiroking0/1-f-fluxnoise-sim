@@ -68,7 +68,8 @@ def washer_device(D: float, d: float) -> sc.Device:
 
     dev = sc.Device("washer", layers=[layer], films=[film], holes=[hole],
                     length_units="um", solve_dtype="float32")
-
+    fig, ax = dev.draw(figsize=(10,5))
+    _ = dev.plot_polygons(ax=ax, legend=True)
     # Mesh density scales (very roughly) with size to keep point count sane
     max_el = 0.2 + 0.8 * (D / 1000.0)   # µm
     dev.make_mesh( min_points=MIN_POINTS,
@@ -79,7 +80,7 @@ def washer_device(D: float, d: float) -> sc.Device:
 # ───────────────────────────────────────────────────────────────
 # Flux‑noise calculator
 
-def flux_noise_rms(device: sc.Device, *, n=N_SPIN, A_s=A_SPIN,
+def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
                    pad=PAD_L, grid_N=300) -> float:
     """Return √S_Φ(1 Hz) in µΦ₀/√Hz for isotropic spins."""
     # Reciprocity: 1 A circulating current around the hole
@@ -140,6 +141,58 @@ def sweep_fixed_width(W_fixed: float = 20.0):
         mean_sizes.append(D + d)
         noises.append(flux_noise_rms(dev))
     return np.array(mean_sizes), np.array(noises)
+
+
+# ───────────────────────────────────────────────────────────────
+# Helper: colour plot of Bz on the spin plane (z = Z_SPIN)
+
+def plot_Bz_color(device: sc.Device,
+                  pad: float = PAD_L,
+                  grid_N: int = 300,
+                  cmap: str = "RdBu_r"):
+    """
+    Plot Bz(x, y) [Tesla per 1 A circulating current] on a quadrant grid.
+
+    Parameters
+    ----------
+    device   : superscreen.Device
+        A meshed SQUID device (same object you pass to flux_noise_rms).
+    pad      : float
+        Extra margin beyond the outer washer edge, in µm
+        (should match *pad* in `flux_noise_rms`).
+    grid_N   : int
+        Number of grid points along x and y (same resolution as the noise calc).
+    cmap     : str
+        Matplotlib colormap.
+    """
+    # ----- 1 A circulating current around the hole  ---------------------------
+    model = sc.factorize_model(device=device, current_units="A")
+    model.set_circulating_currents({"hole": 1.0})
+    solution = sc.solve(model=model)[-1]
+
+    # grid covering the +x,+y quadrant  ----------------------------------------
+    outer = max(abs(device.films["film"].points).flatten())  # µm
+    Rmax  = outer + pad
+    xs    = np.linspace(0.0, Rmax, grid_N)
+    ys    = np.linspace(0.0, Rmax, grid_N)
+    XY    = [(x, y) for x in xs for y in ys]
+
+    Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude.reshape((grid_N, grid_N))          
+
+    # ----- plotting  ----------------------------------------------------------
+    X, Y = np.meshgrid(xs, ys, indexing="xy")
+    fig, ax = plt.subplots(figsize=(5.5, 4.5))
+    im = ax.pcolormesh(X, Y, Bz,
+                       shading="auto", cmap=cmap)
+    cbar = fig.colorbar(im, ax=ax, pad=0.02)
+    cbar.set_label("$B_z$  (T per 1 A)", rotation=270, labelpad=12)
+
+    ax.set_xlabel("$x$ (µm)")
+    ax.set_ylabel("$y$ (µm)")
+    ax.set_aspect("equal")
+    ax.set_title("Reciprocity field $B_z(x,y)$ on spin plane")
+    plt.tight_layout()
+    plt.show()
 
 # ───────────────────────────────────────────────────────────────
 # Main & plotting
