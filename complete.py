@@ -70,7 +70,7 @@ def washer_device(D: float, d: float) -> sc.Device:
                     length_units="um", solve_dtype="float32")
     # fig, ax = dev.draw(figsize=(10,5))
     # _ = dev.plot_polygons(ax=ax, legend=True)
-    
+
     # Mesh density scales (very roughly) with size to keep point count sane
     max_el = 0.2 + 0.8 * (D / 1000.0)   # µm
     dev.make_mesh( min_points=MIN_POINTS,
@@ -217,6 +217,6 @@ if __name__ == "__main__":
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     plt.tight_layout()
-    plt.savefig(f"flux_noise_fig3_{ts}.png", dpi=300)
+    plt.savefig(f"plots/flux_noise_fig3_{ts}.png", dpi=300)
     plt.show()
 
