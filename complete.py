@@ -101,7 +101,10 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     Bz = Bz.reshape((grid_N, grid_N))
 
     # Mutual‑inductance density M(x,y) = Bz * A_s
-    Mp = Bz * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
+    rng   = np.random.default_rng(seed=42)          # reproducible Monte-Carlo
+    n_z   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
+                       
+    Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
     dA = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12  # m² per pixel
 
     integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
