@@ -72,9 +72,9 @@ rectangle = sc.Polygon(
             [-20, R_outer-0],
         ]),
     )
-inner_ring = inner_ring.union(trangle1).union(trangle2).union(rectangle)
+inner_ring = inner_ring.union(trangle1).union(trangle2).union(rectangle).resample(400)
 
-hole1 = outer_ring.difference(inner_ring)  # outer ring minus inner ring
+hole1 = outer_ring.difference(inner_ring).resample(400)  # outer ring minus inner ring
 
 # replace your straight-edge slot with a curvy one
 theta_outer = np.arcsin(20 / R_outer)         # 5.55°
@@ -92,7 +92,7 @@ slot_hole = arc_slot_polygon(
     n_inner     = 40,
     n_outer     = 80,
     orientation = 0,        # puts slot on +y side
-)
+).resample(1000)
 
 
 
@@ -105,48 +105,55 @@ device = sc.Device(
 
 
 
-device.make_mesh(min_points=1000,
-                 buffer = 0)
+device.make_mesh(min_points=10000,
+                 buffer = 0,
+                 smooth=10)
 
-circulating_currents = {"slot": "1000 A"}
-
-solution = sc.solve(
-    device,
-    applied_field=sc.sources.ConstantField(0),
-    circulating_currents=circulating_currents,
-    current_units="uA",
-    progress_bar=True,
-)[-1]
-fig, axes = solution.plot_currents(
-    streamplot=True,
-    figsize=(13,8),
-)
-
-# axes[0] came from solution.plot_currents(...)
-im = axes[0].collections[0]        # the QuadMesh / Pcolormesh
-im.autoscale()                     # recompute vmin/vmax from its data
-fig.canvas.draw_idle()             # update colour bar & display
-
-
-_ = device.plot_polygons(ax=axes[0], lw=2)
-plt.legend(loc="upper right")
-
-
-
-max_J   = -np.inf          # peak magnitude (scalar)
-max_xy  = None             # (x, y) coordinate of that peak
-max_film = None            # name of the film that carries it
-
-for film_name, mesh in device.meshes.items():          # film_name is a str
-    xy   = mesh.sites                                   # (N, 2) mesh vertices
-    # interpolate the 2-vector sheet-current Jx, Jy at *all* mesh vertices
-    Jxy  = solution.interp_current_density(
-               xy, film=film_name, with_units=False)    # (N, 2) array
-    mags = np.linalg.norm(Jxy, axis=1)                  # |J| at each vertex
-    idx  = np.argmax(mags)                              # local peak
-    if mags[idx] > max_J:                               # keep the global peak
-        max_J, max_xy, max_film = mags[idx], xy[idx], film_name
-
-print(f"max |J| = {max_J:.3e} µA/µm  "
-      f"in film '{max_film}' at (x, y) = ({max_xy[0]:.2f}, {max_xy[1]:.2f}) µm")
+fig,ax = device.plot_mesh(edge_color="k",
+                          show_sites=False,
+                          linewidth=0.8)
+_ = device.plot_polygons(ax = ax, legend=True)
 plt.show()
+
+# circulating_currents = {"slot": "1 A"}
+
+# solution = sc.solve(
+#     device,
+#     applied_field=sc.sources.ConstantField(0),
+#     circulating_currents=circulating_currents,
+#     current_units="uA",
+#     progress_bar=True,
+# )[-1]
+# fig, axes = solution.plot_currents(
+#     streamplot=True,
+#     figsize=(13,8),
+# )
+
+# # axes[0] came from solution.plot_currents(...)
+# im = axes[0].collections[0]        # the QuadMesh / Pcolormesh
+# im.autoscale()                     # recompute vmin/vmax from its data
+# fig.canvas.draw_idle()             # update colour bar & display
+
+
+# _ = device.plot_polygons(ax=axes[0], lw=2)
+# plt.legend(loc="upper right")
+
+
+
+# max_J   = -np.inf          # peak magnitude (scalar)
+# max_xy  = None             # (x, y) coordinate of that peak
+# max_film = None            # name of the film that carries it
+
+# for film_name, mesh in device.meshes.items():          # film_name is a str
+#     xy   = mesh.sites                                   # (N, 2) mesh vertices
+#     # interpolate the 2-vector sheet-current Jx, Jy at *all* mesh vertices
+#     Jxy  = solution.interp_current_density(
+#                xy, film=film_name, with_units=False)    # (N, 2) array
+#     mags = np.linalg.norm(Jxy, axis=1)                  # |J| at each vertex
+#     idx  = np.argmax(mags)                              # local peak
+#     if mags[idx] > max_J:                               # keep the global peak
+#         max_J, max_xy, max_film = mags[idx], xy[idx], film_name
+
+# print(f"max |J| = {max_J:.3e} µA/µm  "
+#       f"in film '{max_film}' at (x, y) = ({max_xy[0]:.2f}, {max_xy[1]:.2f}) µm")
+# plt.show()
