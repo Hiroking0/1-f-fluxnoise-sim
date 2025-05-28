@@ -105,8 +105,13 @@ device = sc.Device(
 
 
 
-device.make_mesh(min_points=1000,
-                 buffer = 0)
+device.make_mesh(
+    max_edge_length        = 8,          # coarse everywhere else (µm)
+    hole_max_edge_length   = {"slot": 1},# fine only on the curved slot
+    film_max_edge_length   = {"annulus": 2}, # (optional) finer annulus
+    smooth                 = 100,        # extra Laplacian smoothing passes
+    buffer                 = 0,          # as before
+)
 
 circulating_currents = {"slot": "1000 A"}
 
