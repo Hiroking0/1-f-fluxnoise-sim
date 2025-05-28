@@ -105,9 +105,13 @@ device = sc.Device(
 
 
 
-device.make_mesh(min_points=10000,
-                 buffer = 0,
-                 smooth=10)
+device.make_mesh(
+    max_edge_length      = 8,                 # coarse default
+    hole_max_edge_length = {"slot": 1.0},     # fine slot
+    film_max_edge_length = {"annulus": 2.0},  # finer annulus (optional)
+    smooth               = 100,
+    buffer               = 0,
+)
 
 fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
