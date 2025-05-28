@@ -100,14 +100,3 @@ def arc_slot_polygon(
 
     return sc.Polygon(name=name, layer=layer, points=pts, **kwargs)
 
-def rectange(width: float, height: float, layer: str = "Nb") -> sc.Polygon:
-    sc.Polygon(
-        name="rectangle",
-        layer="Nb",
-        points=np.array([
-            [-16.5, R_outer-110],
-            [ 16.5, R_outer-110],
-            [ 16.5, R_outer-0],
-            [-16.5, R_outer-0],
-        ]),
-    )
