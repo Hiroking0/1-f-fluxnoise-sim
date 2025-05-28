@@ -91,7 +91,6 @@ slot_hole = arc_slot_polygon(
     theta_outer = theta_outer,
     n_inner     = 2000,
     n_outer     = 4000,
-    n_side = 1000,
     orientation = 0,        # puts slot on +y side
 )
 
