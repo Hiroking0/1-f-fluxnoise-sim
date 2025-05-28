@@ -47,56 +47,80 @@ def isosceles_polygon(
 import numpy as np
 import superscreen as sc
 
+import numpy as np
+import superscreen as sc
+
 def arc_slot_polygon(
         name: str,
         layer,
+        *,
         r_inner: float,
         r_outer: float,
         theta_inner: float,
         theta_outer: float,
         n_inner: int = 40,
         n_outer: int = 80,
+        n_side: int  = 0,          # ← NEW: extra points on each radial edge
         orientation: float = 0.0,
         **kwargs,
-):
+) -> sc.Polygon:
     """
-    Build an sc.Polygon representing a curved slot bounded by two
-    circular arcs (r_inner, r_outer) and two short straight segments.
-
-    The slot is symmetric about the local +y axis before `orientation`
-    is applied.
+    Return an sc.Polygon that looks like an annular sector (curved slot).
 
     Parameters
     ----------
-    r_inner, r_outer : float
-        Inner / outer radii (µm).
-    theta_inner, theta_outer : float
-        Half-angles (radians) at r_inner and r_outer, respectively.
-    n_inner, n_outer : int
-        Number of straight segments used to approximate the inner / outer arc.
-    orientation : float
-        Extra CCW rotation (radians).  0 → slot centred on +y.
+    r_inner, r_outer          : radii (µm)
+    theta_inner, theta_outer  : half-angles (rad) at r_inner / r_outer
+    n_inner, n_outer          : # of linear segments on inner / outer arc
+    n_side                    : # of *intermediate* vertices on each radial edge
+    orientation               : extra rotation after building (rad)
+    **kwargs                  : forwarded to sc.Polygon (e.g. color="r")
 
-    Returns
-    -------
-    sc.Polygon
+    Notes
+    -----
+    * vertices are ordered CCW so Superscreen treats this as a hole
+    * set ``n_side`` ≥ 1 if you need finer control on the straight edges
     """
-    # sample outer arc  ( +θₒ  →  −θₒ )
-    tout  = np.linspace( theta_outer, -theta_outer, n_outer)
-    outer = np.column_stack([r_outer*np.sin(tout),
-                             r_outer*np.cos(tout)])
+    # ----- outer arc   +θ_out  →  −θ_out   ------------------------------
+    tout  = np.linspace(theta_outer, -theta_outer, n_outer)
+    outer = np.column_stack([r_outer * np.sin(tout),
+                             r_outer * np.cos(tout)])
 
-    # sample inner arc  ( −θᵢ  →  +θᵢ )
-    tin   = np.linspace(-theta_inner,  theta_inner, n_inner)
-    inner = np.column_stack([r_inner*np.sin(tin),
-                             r_inner*np.cos(tin)])
+    # ----- right radial edge  (outer → inner)  --------------------------
+    p_out_R = outer[0]                                      # first outer point
+    p_in_R  = np.array([r_inner*np.sin(theta_inner),
+                        r_inner*np.cos(theta_inner)])
+    if n_side > 0:
+        t = np.linspace(0, 1, n_side + 2)[1:-1]             # skip endpoints
+        right_edge = p_out_R + (p_in_R - p_out_R)[None, :] * t[:, None]
+    else:
+        right_edge = np.empty((0, 2))
 
-    pts = np.vstack([outer, inner])           # CCW order
+    # ----- inner arc  −θ_in  →  +θ_in  (reverse order) ------------------
+    tin   = np.linspace(-theta_inner, theta_inner, n_inner)
+    inner = np.column_stack([r_inner * np.sin(tin),
+                             r_inner * np.cos(tin)])
 
-    if orientation != 0.0:
+    # ----- left radial edge  (inner → outer)  ---------------------------
+    p_out_L = outer[-1]
+    p_in_L  = np.array([-r_inner*np.sin(theta_inner),
+                         r_inner*np.cos(theta_inner)])
+    if n_side > 0:
+        left_edge  = p_in_L + (p_out_L - p_in_L)[None, :] * t[::-1, None]
+    else:
+        left_edge  = np.empty((0, 2))
+
+    # ----- assemble vertices, CCW order ---------------------------------
+    pts = np.vstack([outer,
+                     right_edge,
+                     inner,
+                     left_edge])
+
+    # ----- optional global rotation ------------------------------------
+    if orientation:
         c, s = np.cos(orientation), np.sin(orientation)
-        pts  = pts @ np.array([[c, -s],
-                               [s,  c]])
+        pts  = pts @ np.array([[c, -s], [s,  c]])
 
     return sc.Polygon(name=name, layer=layer, points=pts, **kwargs)
+
 
