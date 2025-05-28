@@ -57,6 +57,7 @@ def arc_slot_polygon(
         n_inner: int = 40,
         n_outer: int = 80,
         orientation: float = 0.0,
+        **kwargs,
 ):
     """
     Build an sc.Polygon representing a curved slot bounded by two
@@ -97,7 +98,7 @@ def arc_slot_polygon(
         pts  = pts @ np.array([[c, -s],
                                [s,  c]])
 
-    return sc.Polygon(name=name, layer=layer, points=pts)
+    return sc.Polygon(name=name, layer=layer, points=pts, **kwargs)
 
 def rectange(width: float, height: float, layer: str = "Nb") -> sc.Polygon:
     sc.Polygon(
