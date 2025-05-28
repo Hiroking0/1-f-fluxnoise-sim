@@ -101,14 +101,18 @@ def arc_slot_polygon(
     inner = np.column_stack([r_inner * np.sin(tin),
                              r_inner * np.cos(tin)])
 
-    # ----- left radial edge  (inner → outer)  ---------------------------
-    p_out_L = outer[-1]
+   # ----- left radial edge  (inner → outer)  ---------------------------
     p_in_L  = np.array([-r_inner*np.sin(theta_inner),
-                         r_inner*np.cos(theta_inner)])
+                        r_inner*np.cos(theta_inner)])
+    p_out_L = outer[-1]
+
     if n_side > 0:
-        left_edge  = p_in_L + (p_out_L - p_in_L)[None, :] * t[::-1, None]
+        t = np.linspace(0, 1, n_side + 2)[1:-1]          # same `t` as right edge
+        # walk *outward*: inner → outer
+        left_edge  = p_in_L + (p_out_L - p_in_L)[None, :] * t[:, None]
     else:
         left_edge  = np.empty((0, 2))
+
 
     # ----- assemble vertices, CCW order ---------------------------------
     pts = np.vstack([outer,
