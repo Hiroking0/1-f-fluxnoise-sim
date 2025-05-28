@@ -30,7 +30,7 @@ slit2_pts = slit1_pts # mirror in x → rotate 180° about origin
 layer = sc.Layer("Nb", london_lambda=0.085, thickness=0.100)       # adjust to taste
 
 # 3a. ONE big film polygon (slightly larger than the ring so all holes lie within)
-margin = 10
+margin = 20
 outer_box = np.array([
     [-R_outer-margin, -R_outer-margin],
     [ R_outer+margin, -R_outer-margin],
@@ -100,14 +100,15 @@ device = sc.Device(
     "dc_squid_mask",
     layers=[layer],
     films=[film_poly],
-    holes=[hole1, slot_hole],
+    holes=[ hole1,slot_hole],
 )
 
 
 
-device.make_mesh(min_points=10000)
+device.make_mesh(min_points=1000,
+                 buffer = 0)
 
-circulating_currents = {"slot": "1 uA"}
+circulating_currents = {"slot": "1000 A"}
 
 solution = sc.solve(
     device,
@@ -118,7 +119,34 @@ solution = sc.solve(
 )[-1]
 fig, axes = solution.plot_currents(
     streamplot=True,
-    # cross_section_coords=sections,
     figsize=(13,8),
 )
+
+# axes[0] came from solution.plot_currents(...)
+im = axes[0].collections[0]        # the QuadMesh / Pcolormesh
+im.autoscale()                     # recompute vmin/vmax from its data
+fig.canvas.draw_idle()             # update colour bar & display
+
+
 _ = device.plot_polygons(ax=axes[0], lw=2)
+plt.legend(loc="upper right")
+
+
+
+max_J   = -np.inf          # peak magnitude (scalar)
+max_xy  = None             # (x, y) coordinate of that peak
+max_film = None            # name of the film that carries it
+
+for film_name, mesh in device.meshes.items():          # film_name is a str
+    xy   = mesh.sites                                   # (N, 2) mesh vertices
+    # interpolate the 2-vector sheet-current Jx, Jy at *all* mesh vertices
+    Jxy  = solution.interp_current_density(
+               xy, film=film_name, with_units=False)    # (N, 2) array
+    mags = np.linalg.norm(Jxy, axis=1)                  # |J| at each vertex
+    idx  = np.argmax(mags)                              # local peak
+    if mags[idx] > max_J:                               # keep the global peak
+        max_J, max_xy, max_film = mags[idx], xy[idx], film_name
+
+print(f"max |J| = {max_J:.3e} µA/µm  "
+      f"in film '{max_film}' at (x, y) = ({max_xy[0]:.2f}, {max_xy[1]:.2f}) µm")
+plt.show()
