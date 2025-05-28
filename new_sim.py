@@ -89,10 +89,12 @@ slot_hole = arc_slot_polygon(
     r_outer     = R_outer,
     theta_inner = theta_inner,
     theta_outer = theta_outer,
-    n_inner     = 40,
-    n_outer     = 80,
-    orientation = 0,        # puts slot on +y side
-).resample(1000)
+    orientation = 0.0,
+    n_inner     = 60,           # more points → smoother curve
+    n_outer     = 120,
+    mesh_size   = 1.0,          # max edge length (µm) *on this polygon*
+)
+
 
 
 
@@ -106,13 +108,10 @@ device = sc.Device(
 
 
 device.make_mesh(
-    max_edge_length      = 8,                 # coarse default
-    hole_max_edge_length = {"slot": 1.0},     # fine slot
-    film_max_edge_length = {"annulus": 2.0},  # finer annulus (optional)
-    smooth               = 100,
-    buffer               = 0,
+    max_edge_length = 8.0,   # coarse everywhere else
+    smooth          = 100,
+    buffer          = 0,
 )
-
 fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
