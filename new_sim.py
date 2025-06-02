@@ -41,7 +41,7 @@ film_poly = sc.Polygon("groundplane", layer="Nb", points=outer_box)
 
 # 3b.  Holes = annulus + two slits
 outer_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(R_outer, points=400))
-inner_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(R_inner, points=200))
+inner_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(R_inner, points=400))
 slit1      = sc.Polygon("slit1",      layer="Nb", points=slit1_pts).translate(dx=-20, dy=0)
 slit2      = sc.Polygon("slit2",      layer="Nb", points=slit2_pts).translate(dx=20, dy=0)
 
@@ -89,10 +89,10 @@ slot_hole = arc_slot_polygon(
     r_outer     = R_outer,
     theta_inner = theta_inner,
     theta_outer = theta_outer,
-    n_inner     = 2000,
-    n_outer     = 4000,
+    n_inner     = 200,
+    n_outer     = 200,
     orientation = 0,        # puts slot on +y side
-)
+).resample(1000)
 
 
 
@@ -105,9 +105,9 @@ device = sc.Device(
 
 
 
-device.make_mesh(min_points=10000,
+device.make_mesh(min_points=1000,
                  buffer = 0,
-                 smooth=10)
+                 smooth=5)
 
 fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
