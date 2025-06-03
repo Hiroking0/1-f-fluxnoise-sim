@@ -89,23 +89,38 @@ slot_hole = arc_slot_polygon(
     r_outer     = R_outer,
     theta_inner = theta_inner,
     theta_outer = theta_outer,
-    n_inner     = 200,
-    n_outer     = 200,
+    n_inner     = 80,
+    n_outer     = 100,
     orientation = 0,        # puts slot on +y side
-).resample(1000)
+)
 
 
+
+# ─── 4.  Increase points where its needed ──────────────────────────
+sample_points = 400
+R_theta = np.deg2rad(90 - 5.55)
+R_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(R_theta),R_outer * np.sin(R_theta))))
+L_theta = np.deg2rad(90 + 5.55)
+L_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(L_theta),R_outer * np.sin(L_theta))))
+
+L_ring_slot_hole = L_ring.intersection(slot_hole).resample(sample_points)
+R_ring_slot_hole = R_ring.intersection(slot_hole).resample(sample_points)
+slot_hole = slot_hole.union(L_ring_slot_hole).union(R_ring_slot_hole)
+
+L_ring_hole1 = L_ring.intersection(hole1).resample(sample_points)
+R_ring_hole1 = R_ring.intersection(hole1).resample(sample_points)
+hole1 = hole1.union(L_ring_hole1).union(R_ring_hole1)
 
 device = sc.Device(
     "dc_squid_mask",
     layers=[layer],
     films=[film_poly],
-    holes=[ hole1,slot_hole],
+    holes=[ hole1, slot_hole],
 )
 
 
 
-device.make_mesh(min_points=1000,
+device.make_mesh(min_points=5000,
                  buffer = 0,
                  smooth=5)
 
@@ -115,28 +130,28 @@ fig,ax = device.plot_mesh(edge_color="k",
 _ = device.plot_polygons(ax = ax, legend=True)
 plt.show()
 
-# circulating_currents = {"slot": "1 A"}
+circulating_currents = {"slot": "1 A"}
 
-# solution = sc.solve(
-#     device,
-#     applied_field=sc.sources.ConstantField(0),
-#     circulating_currents=circulating_currents,
-#     current_units="uA",
-#     progress_bar=True,
-# )[-1]
-# fig, axes = solution.plot_currents(
-#     streamplot=True,
-#     figsize=(13,8),
-# )
+solution = sc.solve(
+    device,
+    applied_field=sc.sources.ConstantField(0),
+    circulating_currents=circulating_currents,
+    current_units="uA",
+    progress_bar=True,
+)[-1]
+fig, axes = solution.plot_currents(
+    streamplot=True,
+    figsize=(13,8),
+)
 
-# # axes[0] came from solution.plot_currents(...)
-# im = axes[0].collections[0]        # the QuadMesh / Pcolormesh
-# im.autoscale()                     # recompute vmin/vmax from its data
-# fig.canvas.draw_idle()             # update colour bar & display
+# axes[0] came from solution.plot_currents(...)
+im = axes[0].collections[0]        # the QuadMesh / Pcolormesh
+im.autoscale()                     # recompute vmin/vmax from its data
+fig.canvas.draw_idle()             # update colour bar & display
 
 
-# _ = device.plot_polygons(ax=axes[0], lw=2)
-# plt.legend(loc="upper right")
+_ = device.plot_polygons(ax=axes[0], lw=2)
+plt.legend(loc="upper right")
 
 
 

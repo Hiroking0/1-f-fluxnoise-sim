@@ -99,4 +99,3 @@ def arc_slot_polygon(
                                [s,  c]])
 
     return sc.Polygon(name=name, layer=layer, points=pts, **kwargs)
-
