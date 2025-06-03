@@ -2,8 +2,9 @@ import numpy as np
 import superscreen as sc
 from superscreen.geometry import circle   # handy helper that returns a Nx2 array
 import matplotlib.pyplot as plt
-from helper import isosceles_polygon, arc_slot_polygon  # custom helper for isosceles triangles
+from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
+sampling = 1000
 R_outer = 205       # outer radius of the red ring
 R_inner = 105       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
@@ -37,11 +38,11 @@ outer_box = np.array([
     [ R_outer+margin,  R_outer+margin],
     [-R_outer-margin,  R_outer+margin],
 ])
-film_poly = sc.Polygon("groundplane", layer="Nb", points=outer_box)
+film_poly = sc.Polygon("film", layer="Nb", points=outer_box)
 
 # 3b.  Holes = annulus + two slits
-outer_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(R_outer, points=400))
-inner_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(R_inner, points=400))
+outer_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(R_outer, points=sampling))
+inner_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(R_inner, points=sampling))
 slit1      = sc.Polygon("slit1",      layer="Nb", points=slit1_pts).translate(dx=-20, dy=0)
 slit2      = sc.Polygon("slit2",      layer="Nb", points=slit2_pts).translate(dx=20, dy=0)
 
@@ -72,9 +73,9 @@ rectangle = sc.Polygon(
             [-20, R_outer-0],
         ]),
     )
-inner_ring = inner_ring.union(trangle1).union(trangle2).union(rectangle).resample(400)
+inner_ring = inner_ring.union(trangle1).union(trangle2).union(rectangle).resample(sampling)
 
-hole1 = outer_ring.difference(inner_ring).resample(400)  # outer ring minus inner ring
+hole1 = outer_ring.difference(inner_ring).resample(sampling)  # outer ring minus inner ring
 
 # replace your straight-edge slot with a curvy one
 theta_outer = np.arcsin(20 / R_outer)         # 5.55°
@@ -83,7 +84,7 @@ x_inner     = 20 - slope*(R_outer - R_inner)  # 4.72 µm
 theta_inner = np.arcsin(x_inner / R_inner)    # 2.58°
 
 slot_hole = arc_slot_polygon(
-    name        = "slot",
+    name        = "hole",
     layer       = "Nb",
     r_inner     = R_inner,
     r_outer     = R_outer,
@@ -97,18 +98,18 @@ slot_hole = arc_slot_polygon(
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
-sample_points = 400
+hole_sample_points = 400
 R_theta = np.deg2rad(90 - 5.55)
 R_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(R_theta),R_outer * np.sin(R_theta))))
 L_theta = np.deg2rad(90 + 5.55)
 L_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(L_theta),R_outer * np.sin(L_theta))))
 
-L_ring_slot_hole = L_ring.intersection(slot_hole).resample(sample_points)
-R_ring_slot_hole = R_ring.intersection(slot_hole).resample(sample_points)
+L_ring_slot_hole = L_ring.intersection(slot_hole).resample(hole_sample_points)
+R_ring_slot_hole = R_ring.intersection(slot_hole).resample(hole_sample_points)
 slot_hole = slot_hole.union(L_ring_slot_hole).union(R_ring_slot_hole)
 
-L_ring_hole1 = L_ring.intersection(hole1).resample(sample_points)
-R_ring_hole1 = R_ring.intersection(hole1).resample(sample_points)
+L_ring_hole1 = L_ring.intersection(hole1).resample(hole_sample_points)
+R_ring_hole1 = R_ring.intersection(hole1).resample(hole_sample_points)
 hole1 = hole1.union(L_ring_hole1).union(R_ring_hole1)
 
 device = sc.Device(
@@ -118,7 +119,7 @@ device = sc.Device(
     holes=[ hole1, slot_hole],
 )
 
-
+fig, ax = device.draw(legend=True)
 
 device.make_mesh(min_points=5000,
                  buffer = 0,
@@ -128,47 +129,8 @@ fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
+
+
+# noise = flux_noise_rms(device)
+# print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
 plt.show()
-
-circulating_currents = {"slot": "1 A"}
-
-solution = sc.solve(
-    device,
-    applied_field=sc.sources.ConstantField(0),
-    circulating_currents=circulating_currents,
-    current_units="uA",
-    progress_bar=True,
-)[-1]
-fig, axes = solution.plot_currents(
-    streamplot=True,
-    figsize=(13,8),
-)
-
-# axes[0] came from solution.plot_currents(...)
-im = axes[0].collections[0]        # the QuadMesh / Pcolormesh
-im.autoscale()                     # recompute vmin/vmax from its data
-fig.canvas.draw_idle()             # update colour bar & display
-
-
-_ = device.plot_polygons(ax=axes[0], lw=2)
-plt.legend(loc="upper right")
-
-
-
-# max_J   = -np.inf          # peak magnitude (scalar)
-# max_xy  = None             # (x, y) coordinate of that peak
-# max_film = None            # name of the film that carries it
-
-# for film_name, mesh in device.meshes.items():          # film_name is a str
-#     xy   = mesh.sites                                   # (N, 2) mesh vertices
-#     # interpolate the 2-vector sheet-current Jx, Jy at *all* mesh vertices
-#     Jxy  = solution.interp_current_density(
-#                xy, film=film_name, with_units=False)    # (N, 2) array
-#     mags = np.linalg.norm(Jxy, axis=1)                  # |J| at each vertex
-#     idx  = np.argmax(mags)                              # local peak
-#     if mags[idx] > max_J:                               # keep the global peak
-#         max_J, max_xy, max_film = mags[idx], xy[idx], film_name
-
-# print(f"max |J| = {max_J:.3e} µA/µm  "
-#       f"in film '{max_film}' at (x, y) = ({max_xy[0]:.2f}, {max_xy[1]:.2f}) µm")
-# plt.show()
