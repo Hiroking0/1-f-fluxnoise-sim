@@ -164,14 +164,23 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     XY = [(x, y) for x in xs for y in ys]
 
     # B_z field of the 1‑A SQUID at spin plane
-    Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude
+    Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T")
     Bz = Bz.reshape((grid_N, grid_N))
 
     # Mutual‑inductance density M(x,y) = Bz * A_s
-    rng   = np.random.default_rng(seed=42)          # reproducible Monte-Carlo
-    n_z   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
+    rng = np.random.default_rng(42)
+    phi   = rng.uniform(0, 2*np.pi, (grid_N, grid_N))
+    theta = rng.uniform(0, np.pi/2, (grid_N, grid_N))
+    r   = 1
+    n = np.array([
+        np.sin(theta) * np.cos(phi),
+         np.sin(theta) * np.sin(phi), 
+         np.cos(theta)])  # random unit vectors in spherical coordinates
+    
+    print(f"n: {n.shape}, Bz: {Bz.shape}, A_s: {A_s}")
+    
                        
-    Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
+    Mp = np.dot(Bz,n) * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
     dA = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12  # m² per pixel
 
     integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
