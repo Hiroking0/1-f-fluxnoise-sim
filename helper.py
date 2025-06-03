@@ -161,10 +161,10 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     xs = np.linspace(0.0, Rmax, grid_N)
     ys = np.linspace(0.0, Rmax, grid_N)
-    XY = [(x, y) for x in xs for y in ys]
+    XY = [(x, y,Z_SPIN) for x in xs for y in ys]
 
     # B_z field of the 1‑A SQUID at spin plane
-    Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T")
+    Bz = solution.field_at_position(XY, units="T")
     Bz = Bz.reshape((grid_N, grid_N))
 
     # Mutual‑inductance density M(x,y) = Bz * A_s
