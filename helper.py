@@ -153,10 +153,6 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
         # 4) Finally, redraw the device polygons on top so they stay sharp:
         device.plot_polygons(ax=ax, color="w", ls="--", lw=1)
 
-        # (Optional) If you want a colorbar, just do this once:
-        if ax == axes[-1]:
-            cbar = fig.colorbar(quad, ax=axes, fraction=0.046, pad=0.04)
-            cbar.set_label(r"$|\,\mathbf{J}\,|\;(\mathrm{A}/\mu\mathrm{m})$")
 
     
     # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L

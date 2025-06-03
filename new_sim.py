@@ -93,7 +93,7 @@ slot_hole = arc_slot_polygon(
     n_inner     = 80,
     n_outer     = 100,
     orientation = 0,        # puts slot on +y side
-)
+).resample(sampling)
 
 
 
@@ -131,6 +131,6 @@ fig,ax = device.plot_mesh(edge_color="k",
 _ = device.plot_polygons(ax = ax, legend=True)
 
 
-# noise = flux_noise_rms(device)
-# print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
+noise = flux_noise_rms(device)
+print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
 plt.show()
