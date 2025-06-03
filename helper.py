@@ -177,7 +177,7 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
          np.sin(theta) * np.sin(phi), 
          np.cos(theta)])  # random unit vectors in spherical coordinates
     
-    print(f"n: {n.shape}, Bz: {Bz.shape}, A_s: {A_s}")
+    print(f"n: {n.shape}, Bz: {Bz.shape}")
     
                        
     Mp = np.dot(Bz,n) * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
