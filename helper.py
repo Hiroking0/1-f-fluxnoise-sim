@@ -154,10 +154,9 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
         device.plot_polygons(ax=ax, color="w", ls="--", lw=1)
 
 
-    
-    # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
+        # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
     outer = max(abs(device.films["film"].points).flatten())
-    Rmax  = outer
+    Rmax  = outer + pad
 
     xs = np.linspace(0.0, Rmax, grid_N)
     ys = np.linspace(0.0, Rmax, grid_N)
@@ -169,10 +168,9 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     # Mutual‑inductance density M(x,y) = Bz * A_s
     rng   = np.random.default_rng(seed=42)          # reproducible Monte-Carlo
-    n   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
-    
+    n_z   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
                        
-    Mp = Bz * n * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
+    Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
     dA = (xs[1] - xs[0]) * (ys[1] - ys[0]) * 1e-12  # m² per pixel
 
     integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
