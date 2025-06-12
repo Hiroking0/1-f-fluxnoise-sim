@@ -4,7 +4,7 @@ from superscreen.geometry import circle   # handy helper that returns a Nx2 arra
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 500
+sampling = 1600
 R_outer = 205       # outer radius of the red ring
 R_inner = 105       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
@@ -98,7 +98,7 @@ slot_hole = arc_slot_polygon(
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
-hole_sample_points = sampling
+hole_sample_points = int(np.round(sampling/2,0))
 R_theta = np.deg2rad(90 - 5.55)
 R_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(R_theta),R_outer * np.sin(R_theta))))
 L_theta = np.deg2rad(90 + 5.55)
@@ -121,7 +121,7 @@ device = sc.Device(
 
 fig, ax = device.draw(legend=True)
 
-device.make_mesh(min_points=1000,
+device.make_mesh(min_points=10000,
                  buffer = 0,
                  smooth=5)
 

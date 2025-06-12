@@ -49,7 +49,7 @@ N_SPIN   = 5e17      # m⁻²
 PAD_L    = 100.0     # µm  (integration cutoff beyond edge)
 
 # Meshing parameters
-MIN_POINTS = 10_000   # rough target for mesh resolution
+MIN_POINTS = 1_000   # rough target for mesh resolution
 SMOOTH_ITR = 10       # Lloyd smoothing passes
 
 # ───────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ def washer_device(D: float, d: float) -> sc.Device:
 # Flux‑noise calculator
 
 def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
-                   pad=PAD_L, grid_N=300) -> float:
+                   pad=PAD_L, grid_N=600) -> float:
     """Return √S_Φ(1 Hz) in µΦ₀/√Hz for isotropic spins."""
     # Reciprocity: 1 A circulating current around the hole
     model = sc.factorize_model(device=device, current_units="A")
@@ -93,8 +93,8 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     outer = max(abs(device.films["film"].points).flatten())
     Rmax  = outer + pad
 
-    xs = np.linspace(0.0, Rmax, grid_N)
-    ys = np.linspace(0.0, Rmax, grid_N)
+    xs = np.linspace(-Rmax, Rmax, grid_N)
+    ys = np.linspace(-Rmax, Rmax, grid_N)
     XY = [(x, y) for x in xs for y in ys]
 
     # B_z field of the 1‑A SQUID at spin plane
@@ -110,7 +110,7 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
 
-    ms_flux = 8.0 * n * MU_B**2 * integral           # factor 8: 4 quadrants × 2 spins
+    ms_flux = 2.0 * n * MU_B**2 * integral           # factor 8: 4 quadrants × 2 spins
     alpha   = ms_flux / LN_BW                        # 1/f prefactor
 
     return np.sqrt(alpha) / PHI_0 * 1e6              # µΦ₀ / √Hz
