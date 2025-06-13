@@ -4,7 +4,7 @@ from superscreen.geometry import circle   # handy helper that returns a Nx2 arra
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 1600
+sampling = 1000
 R_outer = 205       # outer radius of the red ring
 R_inner = 105       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
@@ -31,7 +31,7 @@ slit2_pts = slit1_pts # mirror in x → rotate 180° about origin
 layer = sc.Layer("Nb", london_lambda=0.085, thickness=0.100)       # adjust to taste
 
 # 3a. ONE big film polygon (slightly larger than the ring so all holes lie within)
-margin = 20
+margin = 500
 outer_box = np.array([
     [-R_outer-margin, -R_outer-margin],
     [ R_outer+margin, -R_outer-margin],
@@ -98,7 +98,7 @@ slot_hole = arc_slot_polygon(
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
-hole_sample_points = int(np.round(sampling/2,0))
+hole_sample_points = 100
 R_theta = np.deg2rad(90 - 5.55)
 R_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(R_theta),R_outer * np.sin(R_theta))))
 L_theta = np.deg2rad(90 + 5.55)
@@ -121,7 +121,7 @@ device = sc.Device(
 
 fig, ax = device.draw(legend=True)
 
-device.make_mesh(min_points=10000,
+device.make_mesh(min_points=5000,
                  buffer = 0,
                  smooth=5)
 
