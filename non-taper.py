@@ -75,9 +75,9 @@ rectangle = sc.Polygon(
     )
 
 box1 = sc.Polygon(name="hole", layer="Nb",points=box(40.75, 111.4,center=(0,(R_outer+R_inner)/2))).resample(sampling)
-inner_component = inner_ring.union(box1).resample(sampling)
+inner_component = inner_ring.union(box1).resample(sampling*2)
 
-hole1 = outer_ring.difference(inner_component).resample(sampling)  # outer ring minus inner ring
+hole1 = outer_ring.difference(inner_component).resample(sampling*2)  # outer ring minus inner ring
 
 # replace your straight-edge slot with a curvy one
 theta_outer = np.arcsin(20 / R_outer)         # 5.55°
@@ -91,29 +91,28 @@ slot_hole = slot_hole.difference(inner_ring).intersection(outer_ring).resample(s
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
-hole_sample_points = 100
-R_theta = np.deg2rad(90 - 5.55)
-R_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(R_theta),R_outer * np.sin(R_theta))))
-L_theta = np.deg2rad(90 + 5.55)
-L_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(6, points=400,center=(R_outer * np.cos(L_theta),R_outer * np.sin(L_theta))))
+hole_sample_points = int(sampling*2)
+center_theta = np.deg2rad(90)
+R_box = sc.Polygon("ring_inner", layer="Nb", points=box(40.75, R_outer * 0.6 , points=400,center=(20,(R_outer+R_inner)/2 )))
+L_box = sc.Polygon("ring_inner", layer="Nb", points=box(40.75, R_outer * 0.6 , points=400,center=(-20,(R_outer+R_inner)/2 )))
 
-# L_ring_slot_hole = L_ring.intersection(slot_hole).resample(hole_sample_points)
-# R_ring_slot_hole = R_ring.intersection(slot_hole).resample(hole_sample_points)
-# slot_hole = slot_hole.union(L_ring_slot_hole).union(R_ring_slot_hole)
+R_box_slot_hole = R_box.intersection(slot_hole).resample(hole_sample_points)
+L_box_slot_hole = L_box.intersection(slot_hole).resample(hole_sample_points)
+slot_hole = slot_hole.union(R_box_slot_hole).union(R_box_slot_hole)
 
-# L_ring_hole1 = L_ring.intersection(hole1).resample(hole_sample_points)
-# R_ring_hole1 = R_ring.intersection(hole1).resample(hole_sample_points)
-# hole1 = hole1.union(L_ring_hole1).union(R_ring_hole1)
+R_box_hole1 = R_box.intersection(hole1).resample(hole_sample_points)
+L_box_hole1 = L_box.intersection(hole1).resample(hole_sample_points)
+hole1 = hole1.union(R_box_hole1).union(L_box_hole1)
+
 
 device = sc.Device(
     "dc_squid_mask",
     layers=[layer],
     films=[film_poly],
-    holes=[hole1,slot_hole ],
+    holes=[slot_hole,hole1],
 )
 
 fig, ax = device.draw(legend=True)
-plt.show()
 
 device.make_mesh(min_points=5000,
                  buffer = 0,
