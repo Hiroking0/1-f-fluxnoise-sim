@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
 sampling = 1000
-R_outer = 205       # outer radius of the red ring
-R_inner = 105       # inner radius of the red ring
+R_outer = 149.94943/2       # outer radius of the red ring
+R_inner = 140/2       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
 slit_depth = R_outer - R_inner
-
+width = 10
 # ─── 2.  Helper to make an isosceles‐triangle slit pointing in +ŷ ────────
 def radial_slit(depth, half_angle, apex=(0, R_outer)):
     """Returns 3×2 array of vertices for a radial triangular slit."""
@@ -46,23 +46,7 @@ inner_ring = sc.Polygon("ring_inner", layer="Nb", points=circle(R_inner, points=
 slit1      = sc.Polygon("slit1",      layer="Nb", points=slit1_pts).translate(dx=-20, dy=0)
 slit2      = sc.Polygon("slit2",      layer="Nb", points=slit2_pts).translate(dx=20, dy=0)
 
-trangle1 = isosceles_polygon(
-        name="slit1",
-        layer="Nb",
-        apex=(0, R_outer),
-        height=110,
-        base_width=33,
-        angle=90,
-    ).translate(dx=-20, dy=0)
 
-trangle2 = isosceles_polygon(
-        name="slit2",
-        layer="Nb",
-        apex=(0, R_outer),
-        height=110,
-        base_width=33,
-        angle=90,
-    ).translate(dx=20, dy=0)
 rectangle = sc.Polygon(
         name="rectangle",
         layer="Nb",
@@ -74,27 +58,21 @@ rectangle = sc.Polygon(
         ]),
     )
 
-box1 = sc.Polygon(name="hole", layer="Nb",points=box(40.75, 111.4,center=(0,(R_outer+R_inner)/2))).resample(sampling)
+box1 = sc.Polygon(name="hole", layer="Nb",points=box(width, 111.4,center=(0,(R_outer+R_inner)/2))).resample(sampling)
 inner_component = inner_ring.union(box1).resample(sampling*2)
 
 hole1 = outer_ring.difference(inner_component).resample(sampling*2)  # outer ring minus inner ring
 
-# replace your straight-edge slot with a curvy one
-theta_outer = np.arcsin(20 / R_outer)         # 5.55°
-slope       = (33/2) / 108
-x_inner     = 20 - slope*(R_outer - R_inner)  # 4.72 µm
-theta_inner = np.arcsin(x_inner / R_inner)    # 2.58°
 
-slot_hole = sc.Polygon(name="hole", layer="Nb",points=box(40.75 - 2 * 0.75011, 111.4, center=(0,(R_outer+R_inner)/2))).resample(sampling)
-
+slot_hole = sc.Polygon(name="hole", layer="Nb",points=box(width - 2 * 0.75011, 111.4, center=(0,(R_outer+R_inner)/2))).resample(sampling)
 slot_hole = slot_hole.difference(inner_ring).intersection(outer_ring).resample(sampling)
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
 hole_sample_points = int(sampling*2)
 center_theta = np.deg2rad(90)
-R_box = sc.Polygon("ring_inner", layer="Nb", points=box(40.75, R_outer * 0.6 , points=400,center=(20,(R_outer+R_inner)/2 )))
-L_box = sc.Polygon("ring_inner", layer="Nb", points=box(40.75, R_outer * 0.6 , points=400,center=(-20,(R_outer+R_inner)/2 )))
+R_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, R_outer , points=400,center=(20,(R_outer+R_inner)/2 )))
+L_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, R_outer , points=400,center=(-20,(R_outer+R_inner)/2 )))
 
 R_box_slot_hole = R_box.intersection(slot_hole).resample(hole_sample_points)
 L_box_slot_hole = L_box.intersection(slot_hole).resample(hole_sample_points)
@@ -108,22 +86,22 @@ hole1 = hole1.union(R_box_hole1).union(L_box_hole1)
 device = sc.Device(
     "dc_squid_mask",
     layers=[layer],
-    films=[film_poly],
-    holes=[slot_hole,hole1],
+    films=[slot_hole,hole1],
+    # holes=[slot_hole,hole1],
 )
 
 fig, ax = device.draw(legend=True)
 plt.show()
-device.make_mesh(min_points=5000,
-                 buffer = 0,
-                 smooth=5)
+# device.make_mesh(min_points=5000,
+#                  buffer = 0,
+#                  smooth=5)
 
-fig,ax = device.plot_mesh(edge_color="k",
-                          show_sites=False,
-                          linewidth=0.8)
-_ = device.plot_polygons(ax = ax, legend=True)
+# fig,ax = device.plot_mesh(edge_color="k",
+#                           show_sites=False,
+#                           linewidth=0.8)
+# _ = device.plot_polygons(ax = ax, legend=True)
 
 
-noise = flux_noise_rms(device)
-print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
-plt.show()
+# noise = flux_noise_rms(device)
+# print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
+# plt.show()
