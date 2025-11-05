@@ -4,13 +4,13 @@ from superscreen.geometry import circle, box   # handy helper that returns a Nx2
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 500
-R_outer = 149.94943/2       # outer radius of the red ring
-R_inner = 140/2       # inner radius of the red ring
+sampling = 50
+R_outer = 451.95585/2       # outer radius of the red ring
+R_inner = 251.9/2       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
 slit_depth = R_outer - R_inner
-width = 5
-jj_width = 1 # Josephson junction width
+width = 39.8
+jj_width = 1.15 # Josephson junction width
 width = width + jj_width*2
 
 # ─── 2.  Helper to make an isosceles‐triangle slit pointing in +ŷ ────────
@@ -61,7 +61,7 @@ rectangle = sc.Polygon(
         ]),
     )
 
-box1 = sc.Polygon(name="hole", layer="Nb",points=box(width, 111.4,center=(0,(R_outer+R_inner)/2),points = sampling))
+box1 = sc.Polygon(name="hole", layer="Nb",points=box(width, R_outer,center=(0,(R_outer+R_inner)/2),points = sampling))
 inner_component = inner_ring.union(box1)
 
 hole1 = outer_ring.difference(inner_component)# outer ring minus inner ring
@@ -95,7 +95,7 @@ device = sc.Device(
 )
 
 fig, ax = device.draw(legend=True)
-# plt.show()
+plt.show()
 device.make_mesh(min_points=5000,
                  buffer = 0,
                  smooth=10)
