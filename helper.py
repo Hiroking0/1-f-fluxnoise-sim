@@ -177,5 +177,5 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     ms_flux = 2.0 * n * MU_B**2 * integral           # factor 8: 4 quadrants × 2 spins
     alpha   = ms_flux / LN_BW                        # 1/f prefactor
-    
-    return np.sqrt(alpha) / PHI_0 * 1e6              # µΦ₀ / √Hz
+    noise = np.sqrt(alpha) / PHI_0 * 1e6  
+    return noise              # µΦ₀ / √Hz

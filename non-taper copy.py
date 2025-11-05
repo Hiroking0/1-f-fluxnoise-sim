@@ -4,7 +4,7 @@ from superscreen.geometry import circle, box   # handy helper that returns a Nx2
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 50
+sampling = 500
 R_outer = 149.94943/2       # outer radius of the red ring
 R_inner = 140/2       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
@@ -12,6 +12,7 @@ slit_depth = R_outer - R_inner
 width = 5
 jj_width = 1 # Josephson junction width
 width = width + jj_width*2
+
 # ─── 2.  Helper to make an isosceles‐triangle slit pointing in +ŷ ────────
 def radial_slit(depth, half_angle, apex=(0, R_outer)):
     """Returns 3×2 array of vertices for a radial triangular slit."""
@@ -73,6 +74,7 @@ slot_hole = slot_hole.difference(inner_ring).intersection(outer_ring)
 # ─── 4.  Increase points where its needed ──────────────────────────
 hole_sample_points = int(sampling*2)
 center_theta = np.deg2rad(90)
+hole1.resample(hole_sample_points)
 R_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, (R_outer - R_inner)*5 , points=sampling*2,center=(width/2,(R_outer+R_inner)/2 )))
 L_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, (R_outer - R_inner)*5 , points=sampling*2,center=(-width/2,(R_outer+R_inner)/2 )))
 
@@ -96,14 +98,13 @@ fig, ax = device.draw(legend=True)
 # plt.show()
 device.make_mesh(min_points=5000,
                  buffer = 0,
-                 smooth=5)
+                 smooth=10)
 
 fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
-plt.show()
 
-# noise = flux_noise_rms(device)
-# print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
-# plt.show()
+noise = flux_noise_rms(device)
+print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
+plt.show()
