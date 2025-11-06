@@ -4,14 +4,14 @@ from superscreen.geometry import circle, box   # handy helper that returns a Nx2
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 50
-R_outer = 451.95585/2       # outer radius of the red ring
-R_inner = 251.9/2       # inner radius of the red ring
+sampling = 1000
+R_outer = 451.56497/2       # outer radius of the red ring
+R_inner = 251.57608/2       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
 slit_depth = R_outer - R_inner
-width = 39.8
+width = 39.874395
 jj_width = 1.15 # Josephson junction width
-width = width + jj_width*2
+# width = width + jj_width
 
 # ─── 2.  Helper to make an isosceles‐triangle slit pointing in +ŷ ────────
 def radial_slit(depth, half_angle, apex=(0, R_outer)):
@@ -41,7 +41,7 @@ outer_box = np.array([
     [ R_outer+margin,  R_outer+margin],
     [-R_outer-margin,  R_outer+margin],
 ])
-film_poly = sc.Polygon("film", layer="Nb", points=outer_box)
+film_poly = sc.Polygon("film", layer="Nb", points=outer_box).resample(int(sampling/2))
 
 # 3b.  Holes = annulus + two slits
 outer_ring = sc.Polygon("ring_outer", layer="Nb", points=circle(R_outer, points=sampling))
@@ -61,18 +61,18 @@ rectangle = sc.Polygon(
         ]),
     )
 
-box1 = sc.Polygon(name="hole", layer="Nb",points=box(width, R_outer,center=(0,(R_outer+R_inner)/2),points = sampling))
+box1 = sc.Polygon(name="hole", layer="Nb",points=box(width + jj_width, R_outer,center=(0,(R_outer+R_inner)/2),points = sampling))
 inner_component = inner_ring.union(box1)
 
 hole1 = outer_ring.difference(inner_component)# outer ring minus inner ring
 
 
-slot_hole = sc.Polygon(name="hole", layer="Nb",points=box(width - 2 * jj_width, 111.4, center=(0,(R_outer+R_inner)/2), points=sampling))
+slot_hole = sc.Polygon(name="hole", layer="Nb",points=box(width - jj_width, 111.4, center=(0,(R_outer+R_inner)/2), points=sampling))
 slot_hole = slot_hole.difference(inner_ring).intersection(outer_ring)
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
-hole_sample_points = int(sampling*2)
+hole_sample_points = int(sampling*3)
 center_theta = np.deg2rad(90)
 hole1.resample(hole_sample_points)
 R_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, (R_outer - R_inner)*5 , points=sampling*2,center=(width/2,(R_outer+R_inner)/2 )))
@@ -104,7 +104,6 @@ fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
-
 noise = flux_noise_rms(device)
 print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
 plt.show()

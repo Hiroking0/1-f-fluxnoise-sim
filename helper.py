@@ -12,10 +12,10 @@ LN_BW = np.log(1e9 / 1e-4)  # ln(f₂ / f₁)
 T_FILM   = 0.10      # µm
 LAMBDA   = 0.001     # µm  (≈ ideal)
 Z_LOOP   = 1.0       # µm  (washer plane)
-Z_SPIN   = 0.0       # µm  (substrate)
+Z_SPIN   = 0       # µm  (substrate)
 A_SPIN   = 0.10      # µm²
 N_SPIN   = 5e17      # m⁻²
-PAD_L    = 100.0     # µm  (integration cutoff beyond edge)
+PAD_L    = 400.0     # µm  (integration cutoff beyond edge)
 
 # Meshing parameters
 MIN_POINTS = 10_000   # rough target for mesh resolution
