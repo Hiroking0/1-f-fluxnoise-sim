@@ -4,14 +4,15 @@ from superscreen.geometry import circle, box   # handy helper that returns a Nx2
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 1000
+sampling = 100
 R_outer = 451.56497/2       # outer radius of the red ring
 R_inner = 251.57608/2       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
 slit_depth = R_outer - R_inner
 width = 39.874395
 jj_width = 1.15 # Josephson junction width
-# width = width + jj_width
+london_lambda = 0.075      # London penetration depth (µm)
+thickness = 0.100        # film thickness (µm)
 
 # ─── 2.  Helper to make an isosceles‐triangle slit pointing in +ŷ ────────
 def radial_slit(depth, half_angle, apex=(0, R_outer)):
@@ -31,7 +32,7 @@ slit1_pts = radial_slit(depth=slit_depth, half_angle=slit_angle/2)
 slit2_pts = slit1_pts # mirror in x → rotate 180° about origin
 
 # ─── 3.  Geometry objects ────────────────────────────────────────────────
-layer = sc.Layer("Nb", london_lambda=0.085, thickness=0.100)       # adjust to taste
+layer = sc.Layer("Nb", london_lambda=london_lambda, thickness=thickness)       # adjust to taste
 
 # 3a. ONE big film polygon (slightly larger than the ring so all holes lie within)
 margin = 500
@@ -104,6 +105,8 @@ fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
-noise = flux_noise_rms(device)
+noise = flux_noise_rms(device,
+                       pad = margin,
+                       grid_N=int((R_outer+margin)*2*5))
 print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
 plt.show()

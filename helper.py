@@ -121,7 +121,7 @@ def arc_slot_polygon(
 
 
 def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
-                   pad=PAD_L, grid_N=600) -> float:
+                   pad=PAD_L, grid_N=1000) -> float:
     """Return √S_Φ(1 Hz) in µΦ₀/√Hz for isotropic spins."""
     # Reciprocity: 1 A circulating current around the hole
     model = sc.factorize_model(device=device, current_units="A")
