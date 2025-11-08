@@ -196,8 +196,8 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     n_z   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
                        
     Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
-    index = (grid_N - 1) / 2
-    dA = (xs[index] - xs[index-1]) * (ys[index] - ys[index-1]) * 1e-12  # m² per pixel
+    
+    dA = (2 * Rmax / grid_N) **2 * 1e-12  # m² per pixel
 
     integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
 
