@@ -157,7 +157,6 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
     outer = max(abs(device.films["film"].points).flatten())
-    print("Outer edge:", outer)
     Rmax  = outer
 
     xs = np.linspace(-Rmax, Rmax, grid_N)
@@ -177,9 +176,12 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     # ----- plotting  ----------------------------------------------------------
     X, Y = np.meshgrid(xs, ys, indexing="xy")
     fig, ax = plt.subplots(figsize=(5.5, 4.5))
-    im = ax.pcolormesh(X, Y, Bz,
-                       shading="auto", cmap="plasma")
-    
+
+    # Use LogNorm for logarithmic color scaling
+    im = ax.pcolormesh(X, Y, np.abs(Bz),  # abs() ensures positive values for log scale
+                    shading="auto", cmap="plasma",
+                    norm=LogNorm(vmin=np.nanmax(np.abs(Bz))*1e-6, vmax=np.nanmax(np.abs(Bz))))
+
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
     cbar.set_label("$B_z$  [T]", rotation=270, labelpad=12)
 

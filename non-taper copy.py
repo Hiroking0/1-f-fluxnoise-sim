@@ -105,7 +105,7 @@ fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
-dis = jj_width
+dis = jj_width/5
 noise = flux_noise_rms(device,
                        pad = 0,
                        grid_N=int((R_outer+margin)*2/dis))
