@@ -158,15 +158,21 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
     outer = max(abs(device.films["film"].points).flatten())
     print("Outer edge:", outer)
-    Rmax  = outer + pad
+    Rmax  = outer
 
     xs = np.linspace(-Rmax, Rmax, grid_N)
     ys = np.linspace(-Rmax, Rmax, grid_N)
-    XY = [(x, y) for x in xs for y in ys]
+    XY = [(x, y) for y in ys for x in xs ]
 
     # B_z field of the 1‑A SQUID at spin plane
     Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude
     Bz = Bz.reshape((grid_N, grid_N))
+
+    nan_indices = np.argwhere(np.isnan(Bz))
+    print("NaNs were found at indices (row, col):")
+    print(nan_indices)
+    print(f"Total NaNs: {len(nan_indices)}")
+    Bz = np.nan_to_num(Bz, nan=0.0)
     
     # ----- plotting  ----------------------------------------------------------
     X, Y = np.meshgrid(xs, ys, indexing="xy")

@@ -96,7 +96,7 @@ device = sc.Device(
 )
 
 fig, ax = device.draw(legend=True)
-plt.show()
+# plt.show()
 device.make_mesh(min_points=5000,
                  buffer = 0,
                  smooth=10)
@@ -105,7 +105,7 @@ fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
-dis = jj_width/10
+dis = jj_width
 noise = flux_noise_rms(device,
                        pad = 0,
                        grid_N=int((R_outer+margin)*2/dis))
