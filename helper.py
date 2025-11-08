@@ -157,7 +157,7 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
     outer = max(abs(device.films["film"].points).flatten())
-    Rmax  = outer
+    Rmax  = outer - pad
 
     xs = np.linspace(-Rmax, Rmax, grid_N)
     ys = np.linspace(-Rmax, Rmax, grid_N)
@@ -196,12 +196,16 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     n_z   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
                        
     Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
+    print("Mp min/max: ", np.min(Mp), np.max(Mp))
     
     dA = (2 * Rmax / grid_N) **2 * 1e-12  # m² per pixel
+    
+    print("dA: ",(2 * Rmax / grid_N) **2, "µm² =",dA,"m²")
 
     integral = np.sum((Mp / (A_s * 1e-12))**2) * dA   # ∫(M/A)² over quadrant
+    print("Integral value: ", integral)
 
     ms_flux = 2.0 * n * MU_B**2 * integral           # factor 8: 4 quadrants × 2 spins
     alpha   = ms_flux / LN_BW                        # 1/f prefactor
-    noise = np.sqrt(alpha) / PHI_0 * 1e6  
-    return noise              # µΦ₀ / √Hz
+    noise = np.sqrt(alpha) / PHI_0 * 1e6             # µΦ₀ / √Hz
+    return noise

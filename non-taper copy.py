@@ -105,9 +105,9 @@ fig,ax = device.plot_mesh(edge_color="k",
                           show_sites=False,
                           linewidth=0.8)
 _ = device.plot_polygons(ax = ax, legend=True)
-dis = jj_width/5
+dis = jj_width*2
 noise = flux_noise_rms(device,
-                       pad = 0,
+                       pad = 50,
                        grid_N=int((R_outer+margin)*2/dis))
 print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
 plt.show()
