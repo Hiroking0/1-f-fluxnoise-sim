@@ -2,6 +2,7 @@ import numpy as np
 import superscreen as sc
 from superscreen.geometry import rotate  # handy for orientation
 from matplotlib.colors import LogNorm, PowerNorm
+import matplotlib.pyplot as plt
 # ───────────────────────────────────────────────────────────────
 # Physical constants
 MU_B  = 9.274e-24         # J/T
@@ -156,6 +157,7 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
 
     # Quadrant grid (x,y ≥ 0) out to outer‑edge + PAD_L
     outer = max(abs(device.films["film"].points).flatten())
+    print("Outer edge:", outer)
     Rmax  = outer + pad
 
     xs = np.linspace(-Rmax, Rmax, grid_N)
@@ -165,6 +167,21 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     # B_z field of the 1‑A SQUID at spin plane
     Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude
     Bz = Bz.reshape((grid_N, grid_N))
+    
+    # ----- plotting  ----------------------------------------------------------
+    X, Y = np.meshgrid(xs, ys, indexing="xy")
+    fig, ax = plt.subplots(figsize=(5.5, 4.5))
+    im = ax.pcolormesh(X, Y, Bz,
+                       shading="auto", cmap="plasma")
+    
+    cbar = fig.colorbar(im, ax=ax, pad=0.02)
+    cbar.set_label("$B_z$  [T]", rotation=270, labelpad=12)
+
+    ax.set_xlabel("$x$ (µm)")
+    ax.set_ylabel("$y$ (µm)")
+    ax.set_aspect("equal")
+    
+    _ = device.plot_polygons(ax=ax,color="black")
 
     # Mutual‑inductance density M(x,y) = Bz * A_s
     rng   = np.random.default_rng(seed=42)          # reproducible Monte-Carlo

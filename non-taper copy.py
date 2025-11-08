@@ -4,7 +4,7 @@ from superscreen.geometry import circle, box   # handy helper that returns a Nx2
 import matplotlib.pyplot as plt
 from helper import isosceles_polygon, arc_slot_polygon, flux_noise_rms  # custom helper for isosceles triangles
 # ─── 1.  Basic dimensions (µm) ───────────────────────────────────────────
-sampling = 300
+sampling = 100
 R_outer = 451.56497/2       # outer radius of the red ring
 R_inner = 251.57608/2       # inner radius of the red ring
 slit_angle = np.deg2rad(8)   # angular width of each triangular slit
@@ -107,7 +107,7 @@ fig,ax = device.plot_mesh(edge_color="k",
 _ = device.plot_polygons(ax = ax, legend=True)
 dis = jj_width/10
 noise = flux_noise_rms(device,
-                       pad = margin,
+                       pad = 0,
                        grid_N=int((R_outer+margin)*2/dis))
 print(f"Flux noise: {noise:.3f} µΦ₀/√Hz at 1 Hz")
 plt.show()
