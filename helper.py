@@ -134,7 +134,6 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     #    not to draw any streamlines.  We’ll handle streamlines manually:
     fig, axes = solution.plot_currents(
         streamplot=True,   # turn off built‐in streamlines
-        figsize=(8, 8),
         cmap="plasma",      # a perceptually uniform colormap
     )
 
@@ -197,6 +196,9 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
                        
     Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
     print("Mp min/max: ", np.min(Mp), np.max(Mp))
+    print("Mp sdev: ", np.std(Mp))
+    print("Mp shape: ", Mp.shape)
+    
     
     dA = (2 * Rmax / grid_N) **2 * 1e-12  # m² per pixel
     
