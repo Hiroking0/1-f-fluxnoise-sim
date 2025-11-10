@@ -73,11 +73,11 @@ slot_hole = slot_hole.difference(inner_ring).intersection(outer_ring)
 
 
 # ─── 4.  Increase points where its needed ──────────────────────────
-hole_sample_points = int(sampling*8)
+hole_sample_points = int(sampling*14)
 center_theta = np.deg2rad(90)
 hole1.resample(hole_sample_points)
-R_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, (R_outer - R_inner)*5 , points=sampling*2,center=(width/2,(R_outer+R_inner)/2 )))
-L_box = sc.Polygon("ring_inner", layer="Nb", points=box(width, (R_outer - R_inner)*5 , points=sampling*2,center=(-width/2,(R_outer+R_inner)/2 )))
+R_box = sc.Polygon("ring_inner", layer="Nb", points=box(width/3, (R_outer - R_inner)*5 , points=sampling*2,center=(width/2,(R_outer+R_inner)/2 )))
+L_box = sc.Polygon("ring_inner", layer="Nb", points=box(width/3, (R_outer - R_inner)*5 , points=sampling*2,center=(-width/2,(R_outer+R_inner)/2 )))
 
 # # ─── 5.  Create device ────────────────────────────────────────────────
 # R_box_slot_hole = R_box.intersection(slot_hole).resample(hole_sample_points)
