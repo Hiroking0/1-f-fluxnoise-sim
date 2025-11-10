@@ -163,23 +163,30 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     XY = [(x, y) for y in ys for x in xs ]
 
     # B_z field of the 1‑A SQUID at spin plane
-    Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T").magnitude
-    Bz = Bz.reshape((grid_N, grid_N))
+    # Bz = solution.field_at_position(XY, zs=Z_SPIN, units="T",)
+    Bvec = solution.screening_field_at_position(XY, zs=Z_SPIN,vector = True, units="T",with_units=False)
 
-    nan_indices = np.argwhere(np.isnan(Bz))
+    nan_indices = np.argwhere(np.isnan(Bvec))
     print("NaNs were found at indices (row, col):")
     print(nan_indices)
     print(f"Total NaNs: {len(nan_indices)}")
-    Bz = np.nan_to_num(Bz, nan=0.0)
     
+    ###### Reshaping Bvec and handling NaNs ######
+    Bvec = np.nan_to_num(Bvec, nan=0.0)
+    Bvec = Bvec.reshape(grid_N,grid_N, 3) 
+    Bx, By, Bz = Bvec[..., 0], Bvec[..., 1], Bvec[..., 2]
+    # Compute the magnitude |B|
+    Bmag = np.sqrt(Bx**2 + By**2 + Bz**2).reshape((grid_N, grid_N))
+
     # ----- plotting  ----------------------------------------------------------
     X, Y = np.meshgrid(xs, ys, indexing="xy")
     fig, ax = plt.subplots(figsize=(5.5, 4.5))
 
     # Use LogNorm for logarithmic color scaling
-    im = ax.pcolormesh(X, Y, np.abs(Bz),  # abs() ensures positive values for log scale
-                    shading="auto", cmap="plasma",
-                    norm=LogNorm(vmin=np.nanmax(np.abs(Bz))*1e-6, vmax=np.nanmax(np.abs(Bz))))
+    im = ax.pcolormesh(
+    X, Y, Bmag,
+    shading="auto", cmap="plasma",
+    norm=LogNorm(vmin=np.nanmax(Bmag)*1e-6, vmax=np.nanmax(Bmag)))
 
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
     cbar.set_label("$B_z$  [T]", rotation=270, labelpad=12)
@@ -191,10 +198,31 @@ def flux_noise_rms(device: sc.Device, n=N_SPIN, A_s=A_SPIN,
     _ = device.plot_polygons(ax=ax,color="black")
 
     # Mutual‑inductance density M(x,y) = Bz * A_s
-    rng   = np.random.default_rng(seed=42)          # reproducible Monte-Carlo
-    n_z   = rng.uniform(-1.0, 1.0, size=Bz.shape)   # cosθ ~ U[−1,1]
+    rng = np.random.default_rng(seed=42)
+
+    # Shape of the desired vector field
+    shape = Bmag.shape
+
+    # Randomly sample direction angles
+    phi = rng.uniform(0, 2*np.pi, size=shape)       # azimuthal angle
+    cos_theta = rng.uniform(-1, 1, size=shape)      # uniform in cosθ
+    sin_theta = np.sqrt(1 - cos_theta**2)
+
+    # Convert spherical → Cartesian components
+    nx = sin_theta * np.cos(phi)
+    ny = sin_theta * np.sin(phi)
+    nz = cos_theta
+
+    # Stack into a unit vector array
+    n_vec = np.stack((nx, ny, nz), axis=-1)   # shape = (*Bz.shape, 3)
                        
-    Mp = Bz * n_z * A_s * 1e-12           # convert µm² → m² (H = Wb/A)
+    # Ensure both arrays have the same shape (Ny, Nx, 3)
+    assert Bvec.shape == n_vec.shape, f"Shape mismatch: {Bvec.shape} vs {n_vec.shape}"
+
+    # Compute the dot product B·n for every grid point
+    Bn_dot = np.einsum("ijk,ijk->ij", Bvec, n_vec)   # shape (Ny, Nx)
+    
+    Mp = Bn_dot * A_s * 1e-12   
     print("Mp min/max: ", np.min(Mp), np.max(Mp))
     print("Mp sdev: ", np.std(Mp))
     print("Mp shape: ", Mp.shape)
